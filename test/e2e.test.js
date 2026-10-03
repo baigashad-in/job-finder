@@ -27,7 +27,8 @@ test('full pipeline against mock TinyFish', async (t) => {
   t.after(() => mock.server.close());
 
   const logs = [];
-  const r1 = await runPipeline(PREFS, { tf: new TinyFish(), store, log: (k, m) => logs.push(`[${k}] ${m}`) });
+  const links = [];
+  const r1 = await runPipeline(PREFS, { tf: new TinyFish(), store, log: (k, m, x) => { logs.push(`[${k}] ${m}`); if (x && x.link) links.push(x.link); } });
   const titles = r1.listings.map((l) => `${l.company} | ${l.title}`);
   console.log(logs.join('\n'));
   console.log(titles.map((x, i) => `${r1.listings[i].score} ${x} ${r1.listings[i].visa.status}`).join('\n'));
@@ -45,7 +46,12 @@ test('full pipeline against mock TinyFish', async (t) => {
     const profiles = mock.st.calls.agentStart.map((b) => `${new URL(b.url).hostname}:${b.browser_profile}`);
     assert.deepEqual(profiles.sort(), ['careers.vandelay.com:lite', 'umbrella.wd5.myworkdayjobs.com:lite', 'umbrella.wd5.myworkdayjobs.com:stealth']);
     const stealth = mock.st.calls.agentStart.find((b) => b.browser_profile === 'stealth');
-    assert.deepEqual(stealth.proxy_config, { enabled: true, type: 'tetra', country_code: 'US' });
+    assert.deepEqual(stealth.proxy_config, { enabled: true, country_code: 'US' });
+  });
+
+  await t.test('reports a live browser link for each Agent run', () => {
+    assert.equal(links.length, 3, 'two first runs plus the stealth retry');
+    assert.ok(links.every((u) => u.startsWith('https://live.example.test/run_')));
   });
 
   await t.test('returns exactly the expected matches', () => {
@@ -118,6 +124,14 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.equal(r4.usage.agent.runs, 0);
     assert.ok(r4.warnings.some((w) => /Skipped 1 careers site because/.test(w)));
     assert.ok(r4.listings.some((l) => l.company === 'Umbrella'), 'Search hit on Workday still read with Fetch');
+  });
+
+  process.env.AGENT_RUNS_LIMIT = '1';
+  const r6 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
+  delete process.env.AGENT_RUNS_LIMIT;
+  await t.test('AGENT_RUNS_LIMIT caps Agent runs whatever the user asks for', () => {
+    assert.equal(r6.agentSites.length, 1);
+    assert.ok(r6.warnings.some((w) => /at most 1 Agent run per search/.test(w)));
   });
 
   const r5 = await runPipeline({ ...PREFS, role: 'data analyst', seniority: 'any', visa: 'any', locations: '', companies: '', maxAgentRuns: 0 }, { tf: new TinyFish(), store });

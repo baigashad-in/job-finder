@@ -125,7 +125,7 @@ class TinyFish {
   }
 
   // Agent API. Starts an async run, polls until it finishes, cancels it if it runs too long.
-  async agentRun(body, { maxWaitMs = 180000, pollMs = Number(process.env.AGENT_POLL_MS || 4000), onProgress } = {}) {
+  async agentRun(body, { maxWaitMs = 180000, pollMs = Number(process.env.AGENT_POLL_MS || 4000), onProgress, onStream } = {}) {
     this.stats.agent.runs++;
     const start = await this._request(`${this.agentUrl}/v1/automation/run-async`, {
       method: 'POST', body, timeoutMs: 30000, retries: 1,
@@ -137,6 +137,7 @@ class TinyFish {
     }
     const deadline = Date.now() + maxWaitMs;
     let lastStatus = '';
+    let streamSent = false;
     while (Date.now() < deadline) {
       await sleep(pollMs);
       let run;
@@ -145,6 +146,10 @@ class TinyFish {
       } catch (err) {
         this.log(`Polling run ${runId} failed once: ${err.message}`);
         continue;
+      }
+      if (run && run.streaming_url && !streamSent && onStream) {
+        streamSent = true; // live browser view, only valid while the run is going
+        onStream(run.streaming_url);
       }
       if (run && run.status !== lastStatus) {
         lastStatus = run.status;

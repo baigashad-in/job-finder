@@ -115,7 +115,8 @@ function runBody(target, goal, stealth, country) {
     browser_profile: stealth ? 'stealth' : 'lite',
     agent_config: { max_duration_seconds: Math.round(MAX_WAIT_MS / 1000) - 20 },
   };
-  if (stealth && PROXY_COUNTRIES.has(country)) body.proxy_config = { enabled: true, type: 'tetra', country_code: country };
+  // Only enabled + country_code: the official SDK (0.8.0) rejects any other proxy_config field.
+  if (stealth && PROXY_COUNTRIES.has(country)) body.proxy_config = { enabled: true, country_code: country };
   return body;
 }
 
@@ -138,14 +139,16 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
     let run;
     let parsed;
     try {
+      const onStream = (url) => log('agent', `${t.company}: live browser view available`, { link: url });
       run = await tf.agentRun(runBody(t, goal, false, p.country), {
         maxWaitMs: MAX_WAIT_MS,
         onProgress: (s) => log('agent', `${t.company}: run ${s.toLowerCase()}`),
+        onStream,
       });
       parsed = parseAgentResult(run);
       if (parsed.blocked && STEALTH_RETRY) {
         log('agent', `${t.company}: blocked, retrying once in stealth mode`);
-        run = await tf.agentRun(runBody(t, goal, true, p.country), { maxWaitMs: MAX_WAIT_MS });
+        run = await tf.agentRun(runBody(t, goal, true, p.country), { maxWaitMs: MAX_WAIT_MS, onStream });
         parsed = parseAgentResult(run);
       }
     } catch (err) {

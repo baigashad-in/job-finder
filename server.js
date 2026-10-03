@@ -15,7 +15,7 @@ const store = require('./src/store');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const REFRESH_HOURS = Number(process.env.REFRESH_HOURS || 0);
-const VERSION = '1.0.0';
+const VERSION = '2.0.0';
 const INDEX = path.join(__dirname, 'public', 'index.html');
 
 const tasks = new Map(); // id -> { status, log, result, error, startedAt }
@@ -50,8 +50,8 @@ function startTask(prefs, { force = false, label = 'search' } = {}) {
   const id = crypto.randomBytes(6).toString('hex');
   const task = { id, label, status: 'running', log: [], result: null, error: null, startedAt: Date.now() };
   tasks.set(id, task);
-  const log = (kind, msg) => {
-    task.log.push({ t: Date.now() - task.startedAt, kind, msg });
+  const log = (kind, msg, extra) => {
+    task.log.push({ t: Date.now() - task.startedAt, kind, msg, link: extra && extra.link ? String(extra.link) : undefined });
     if (task.log.length > 400) task.log.shift();
   };
   (async () => {

@@ -37,7 +37,7 @@ async function main() {
     discover: !a['no-discover'],
   };
   const tf = new TinyFish({ log: (m) => console.error(`  ! ${m}`) });
-  const r = await runPipeline(prefs, { tf, store, force: !!a.refresh, log: (k, m) => console.error(`[${k}] ${m}`) });
+  const r = await runPipeline(prefs, { tf, store, force: !!a.refresh, log: (k, m, x) => console.error(`[${k}] ${m}${x && x.link ? ` ${x.link}` : ''}`) });
   const top = Number(a.top || 25);
   console.log('');
   for (const l of r.listings.slice(0, top)) {

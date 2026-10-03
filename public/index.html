@@ -370,6 +370,8 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
       const t = await api(`/api/task/${state.taskId}?since=${state.logSeen}`);
       for (const line of t.log) {
         const li = el('li', { class: line.kind }, el('span', { class: 'kind', text: line.kind === 'step' ? '' : line.kind }), line.msg);
+        const live = line.link && safeHref(line.link);
+        if (live) li.append(' ', el('a', { href: live, target: '_blank', rel: 'noopener', text: 'Watch live' }));
         $('log').append(li);
       }
       state.logSeen += t.log.length;

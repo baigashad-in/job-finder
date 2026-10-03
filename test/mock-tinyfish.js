@@ -164,6 +164,10 @@ function startMock(port = 0) {
         if (!body.url || !body.goal) return send(400, { error: { code: 'INVALID_INPUT' } });
         try { if (body.output_schema) validateSchema(body.output_schema); } catch (e) { return send(400, { error: { code: 'INVALID_INPUT', message: e.message } }); }
         if (body.agent_config && 'max_steps' in body.agent_config) return send(403, { error: { code: 'FORBIDDEN', message: 'max_steps is beta' } });
+        // Mirror the official SDK 0.8.0 strict proxy_config schema.
+        if (body.proxy_config && Object.keys(body.proxy_config).some((k) => !['enabled', 'country_code'].includes(k))) {
+          return send(400, { error: { code: 'INVALID_INPUT', message: 'proxy_config only accepts enabled and country_code' } });
+        }
         st.calls.agentStart.push(body);
         const id = `run_${st.runs.size + 1}`;
         st.runs.set(id, { ...body, created: Date.now() });
@@ -175,7 +179,7 @@ function startMock(port = 0) {
         if (!run) return send(404, { error: 'not found' });
         if (m[2]) { st.calls.cancel++; return send(200, { run_id: m[1], status: 'CANCELLED' }); }
         st.calls.agentPoll++;
-        if (Date.now() - run.created < 150) return send(200, { run_id: m[1], status: 'RUNNING', result: null });
+        if (Date.now() - run.created < 150) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });
         return send(200, { run_id: m[1], status: 'COMPLETED', num_of_steps: 7, result: agentResult(run, st), error: null });
       }
       return send(404, { error: 'unknown route' });

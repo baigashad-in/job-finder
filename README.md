@@ -1,10 +1,61 @@
-# TinyFish Job Finder
+# Job Finder
 
-A job and internship finder that reads live openings from company careers pages, matches them to what you want (role, level, location, visa), removes duplicates, ranks them, and tells you what is new since your last check.
+**Live link:** _add URL after deploy (see "Deploying a live demo" below)_
 
-It runs on your own computer. Node 18 or newer, no dependencies to install.
+A job and internship finder for students. **TinyFish Search** finds which companies are hiring for your role, **TinyFish Fetch** reads each company's full job board and the posting pages behind the best matches, and **TinyFish Agent** browses careers sites that have no feed (Workday, Workable, custom pages). The app then matches every opening to your role, level, location and visa needs, removes duplicates, ranks the rest with reasons, and marks what is new since your last check.
 
-## Quick start
+## Demo video
+
+_Add a 60 to 90 second GIF or MP4 after a live run._ Suggested shots:
+
+1. Type a real search ("software engineer, intern, New York; Remote, need sponsorship"), add two companies you follow, press **Find jobs**.
+2. The progress log: Search finding boards, Fetch reading them, the Agent browsing a Workday site, with its **Watch live** link open in a second tab.
+3. Results: match score, reasons, a visa chip with the quoted sentence, **Apply** opening the real posting.
+4. "Where these came from": which API read each company, and how many jobs each filter removed.
+5. Run it again: the Agent result comes from cache (0 credits) and **New only** shows only fresh postings.
+
+## How TinyFish is called
+
+The app calls the REST endpoints directly so it has zero dependencies. Every request body was checked against the official `@tiny-fish/sdk` 0.8.0 schemas.
+
+**Search** finds job boards (`src/discover.js`):
+
+```js
+const results = await tf.search({
+  query: q.query,                    // "software engineer intern New York"
+  include_domains: ATS_DOMAINS,      // greenhouse, lever, ashby, smartrecruiters, workday, workable
+  location: p.country,
+  recency_minutes: q.recency_minutes,
+  purpose: `Find open ${p.role} job postings on company job boards`,
+});
+```
+
+**Fetch** reads every open job at each company in one batch (`src/read.js`, `src/tinyfish.js`):
+
+```js
+// POST https://api.fetch.tinyfish.ai, up to 10 URLs per request, batches run in parallel
+const body = { urls: batch, format: 'markdown', links: false, per_url_timeout_ms: 60000, ttl, purpose };
+```
+
+**Agent** browses sites with no feed and returns structured JSON (`src/agent.js`):
+
+```js
+// POST https://agent.tinyfish.ai/v1/automation/run-async, then poll GET /v1/runs/{id}
+const body = {
+  url: target.url,                   // e.g. https://company.wd5.myworkdayjobs.com/en-US/External
+  goal,                              // "search for 'intern software engineer', apply the location
+                                     //  filter, read at most 2 pages, return title, location,
+                                     //  posted, url... If you hit a captcha, set blocked to true."
+  output_schema: OUTPUT_SCHEMA,      // { blocked, jobs: [{ title, location, posted, url, department }] }
+  browser_profile: stealth ? 'stealth' : 'lite',
+  agent_config: { max_duration_seconds: 180 },
+};
+if (stealth) body.proxy_config = { enabled: true, country_code: 'US' };
+```
+
+## How to run
+
+Needs Node 18 or newer. Nothing to install.
 
 ```bash
 export TINYFISH_API_KEY="your key from https://agent.tinyfish.ai/api-keys"
@@ -12,42 +63,67 @@ npm start
 # open http://localhost:3000
 ```
 
-Type your search as a sentence: "Find **software engineer** roles at **intern** level in **New York; Remote**, and I **need** visa sponsorship." Press **Find jobs**.
+Or copy `.env.example` to `.env` and run `npm run start:env` (Node 20.6 or newer).
 
-Under **More options** you can add:
+Environment variables:
 
-* **Companies to always check**: names (`Stripe`) or careers page URLs, one per line.
-* **Keywords that rank higher** (`python, payments`) and **words that hide a job** (`clearance, unpaid`).
-* **Search country**, **posted within** (7 to 60 days, or any time).
-* **Careers sites to browse with Agent**: 0 means only the free Search and Fetch APIs are used.
+* `TINYFISH_API_KEY` (required): covers Search, Fetch and Agent.
+* `PORT` (3000) and `HOST` (127.0.0.1, so only your computer can reach it).
+* `REFRESH_HOURS` (0, off): re-run every saved search on this schedule.
+* `AGENT_RUNS_LIMIT` (6): most Agent runs per search for everyone on this server.
+* `MAX_BOARDS` (25): job boards read per search. `ENRICH_LIMIT` (20): posting pages read per search.
+* `AGENT_CACHE_HOURS` (12), `AGENT_MAX_WAIT_SECONDS` (200), `AGENT_STEALTH_RETRY` (1).
+* `DATA_DIR` (./data): saved searches, seen jobs and the Agent cache.
 
-Results show a match score out of 100, the reasons for it, level, remote, visa status with the exact sentence from the posting, posted date, and an **Apply** link. You can filter, sort, export CSV, and save the search.
+Command line version:
 
-## How TinyFish Search, Fetch and Agent are used
+```bash
+node cli.js --role "data analyst" --level entry --locations "Chicago; Remote" \
+  --visa need --keywords "sql, tableau" --companies "Stripe, Figma" --agents 0 --out results.json
+```
 
-Each API does a job the others cannot do well. The UI's "Where these came from" table and usage line show exactly which API read each company in every run.
+Tests (no network or credits needed): `npm test`
 
-**1. Search finds where the jobs are (free).**
-The app turns your preferences into 2 to 4 queries (for example `software engineer intern New York`) and restricts them with `include_domains` to the job systems most companies use: Greenhouse, Lever, Ashby, SmartRecruiters, Workday and Workable. The first query uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app that Acme has a Greenhouse board, so it reads the whole board in step 2, not just that one posting. Search also turns each company name in your watchlist into its real job board, and when a company has no job-system board, it finds the company's own careers page (with job aggregators like LinkedIn and Indeed excluded).
+## Architecture
 
-**2. Fetch reads the job boards and postings (free).**
-Greenhouse, Lever, Ashby and SmartRecruiters publish a public JSON feed per company. One Fetch request (up to 10 URLs, batched in parallel) returns every open job at those companies with title, location, date and usually the full description. Fetch is also used to:
+```
+Browser: public/index.html
+  |  POST /api/search, then polls GET /api/task/:id for progress and results
+  v
+server.js  (Node, no dependencies; the API key never leaves the server)
+  |
+  v
+src/pipeline.js
+  1. discover.js  -> TinyFish Search   job boards for your role, watchlist company lookup
+  2. read.js      -> TinyFish Fetch    each board's full public job feed
+  3. agent.js     -> TinyFish Agent    Workday, Workable and custom careers sites
+                                       (capped, cached 12h, slow runs cancelled,
+                                        one stealth retry only if blocked)
+  4. match.js                          merge duplicates found by different sources
+  5. read.js      -> TinyFish Fetch    top posting pages: visa wording, dates, closed jobs
+  6. match.js                          score, filter, rank, mark "new since last run"
+  |
+  v
+data/  saved searches, seen jobs, Agent cache (JSON files)
+```
 
-* confirm a watchlist company's board by trying its likely feed URLs when Search misses it,
-* fall back to reading the human board page and pulling job links out of it if a feed cannot be parsed,
-* read the posting page of the top matches that have no description yet (Agent results, SmartRecruiters, Workday postings found by Search). That text is what visa detection and keyword matching read, and it is how closed postings ("no longer available", 404) get removed.
+## Deploying a live demo
 
-The app sends `ttl` so normal runs can reuse a cache entry up to 1 hour old, and **Skip caches** sends `ttl: 0` for a fully live read.
+The server needs a host that keeps a Node process running, such as Render, Railway or Fly.io. Searches run as background tasks in memory, so serverless platforms (like Vercel functions) will not work without changes.
 
-**3. Agent browses sites that have no feed (uses credits).**
-Workday, Workable and custom careers pages have no simple public feed. They need a real browser to type into the search box, apply a location filter and page through results. For those sites the app starts an Agent run (`/v1/automation/run-async`) with a step-by-step goal and an `output_schema`, so the result comes back as structured JSON: title, location, posted date, department and link for up to 25 postings. Spending is kept in check:
+Before you make it public:
 
-* runs are capped per search (default 2, you choose 0 to 6), with your watchlist sites first,
-* results are cached for 12 hours, so re-running the same search costs nothing,
-* runs that take too long are cancelled (`/v1/runs/{id}/cancel`),
-* a run is retried once in `stealth` mode with a proxy only if the site blocked it.
+* Set `HOST=0.0.0.0` so the host can reach it.
+* Set `AGENT_RUNS_LIMIT=1` or `0`. Every visitor's search spends your Agent credits; Search and Fetch stay free.
+* Saved searches and "new since last run" are shared by everyone using the server. There are no user accounts.
 
-Agent links are made absolute and only `http` and `https` links are kept.
+## What each TinyFish API does here
+
+**Search (free)** turns your preferences into 2 to 4 queries restricted with `include_domains` to the job systems most companies use. The first query uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
+
+**Fetch (free)** reads the public JSON feed that Greenhouse, Lever, Ashby and SmartRecruiters publish for each company: every open job with title, location, date and usually the full description. It also confirms a watchlist company's board by trying its likely feed URLs, falls back to the human board page if a feed cannot be parsed, and reads the posting pages of top matches that have no description yet. That page text drives visa detection, keyword matching and removal of closed postings. Normal runs accept a cache entry up to 1 hour old (`ttl: 3600`); **Skip caches** sends `ttl: 0`.
+
+**Agent (uses credits)** handles sites that need a real browser to type a search, apply a location filter and page through results. It returns structured JSON through `output_schema`. While it runs, the progress log shows a **Watch live** link to the Agent's browser. Spending is controlled: runs are capped per search (your watchlist first), results are cached for 12 hours, slow runs are cancelled, and a run is retried once in `stealth` mode with a proxy only if the site blocked it. Only `http` and `https` links from Agent results are kept.
 
 ## How matching works
 
@@ -70,34 +146,15 @@ Below the results, the app tells you how many jobs were removed for each reason,
 * **Saved searches** keep your preferences and last results. Start the server with `REFRESH_HOURS=24` to re-run every saved search on a schedule.
 * **Closed postings** found while reading pages are removed.
 
-## Command line
-
-```bash
-node cli.js --role "data analyst" --level entry --locations "Chicago; Remote" \
-  --visa need --keywords "sql, tableau" --companies "Stripe, Figma" --agents 0 --out results.json
-```
-
-Run `node cli.js` with no arguments to see all options. Progress goes to stderr, ranked results go to stdout.
-
-## Settings
-
-All optional except the key. See `.env.example`.
-
-* `TINYFISH_API_KEY` (required)
-* `PORT` (3000) and `HOST` (127.0.0.1, so only your computer can reach it)
-* `REFRESH_HOURS` (0, off)
-* `MAX_BOARDS` (25) job boards read per search, `ENRICH_LIMIT` (20) posting pages read per search
-* `AGENT_CACHE_HOURS` (12), `AGENT_MAX_WAIT_SECONDS` (200), `AGENT_STEALTH_RETRY` (1)
-
 ## Tests
 
 ```bash
 npm test
 ```
 
-27 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent schemas TinyFish would reject, and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+29 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
-The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
+The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 
 ## Known limits
 
@@ -119,13 +176,5 @@ The end-to-end test checks that a full run uses all three APIs, returns exactly 
 * `src/ats.js`: job system detection and feed parsers
 * `src/match.js`: scoring, visa detection, location rules, dedupe
 * `src/pipeline.js`: runs the steps in order
+* `src/util.js`: concurrency pool, posted-date parsing, plurals
 * `src/store.js`: JSON files in `data/` for saved searches, seen jobs and the Agent cache
-
-## Demo script (about 2 minutes)
-
-1. Start the server and open the page. Type a search you actually care about, add two companies you follow, set Agent to 2, press **Find jobs**.
-2. Point at the progress log: Search finding boards, Fetch reading them, Agent browsing a Workday site.
-3. Show the results: score, reasons, a visa chip with its quoted sentence, and **Apply** links that open the real posting.
-4. Scroll to "Where these came from" to show which API read each company and the removal counts.
-5. Save the search and run it again: the Agent result comes from cache (0 credits) and the **New** filter shows only fresh postings.
-6. Change the role or city and run again to show it works for other inputs.

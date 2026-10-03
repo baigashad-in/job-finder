@@ -27,6 +27,12 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const p = normalizePrefs(rawPrefs);
   const searchId = store.searchIdFor(p);
   const warnings = [];
+  // Server-wide ceiling on Agent runs, for public deploys where visitors spend your credits.
+  const limit = Number.parseInt(process.env.AGENT_RUNS_LIMIT, 10);
+  if (Number.isFinite(limit) && limit >= 0 && p.maxAgentRuns > limit) {
+    warnings.push(`This server allows at most ${plural(limit, 'Agent run')} per search.`);
+    p.maxAgentRuns = limit;
+  }
 
   // 1. Discover
   const disc = await discover(p, tf, log, warnings);
