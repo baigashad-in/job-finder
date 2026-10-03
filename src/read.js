@@ -6,7 +6,7 @@
 //             postings found by Search), Fetch the posting page itself. The text is
 //             what visa detection, keyword matching and "job closed" checks read.
 
-const { PARSERS, parseJsonText, jobLinksFromMarkdown, clip, toIso } = require('./ats');
+const { PARSERS, parseJsonText, jobLinksFromMarkdown, workdayJobsFromMarkdown, clip, toIso } = require('./ats');
 const { pool, plural } = require('./util');
 
 function byRequestedUrl(res) {
@@ -127,4 +127,38 @@ async function enrich(listings, p, tf, log, limit, force) {
   return { read: todo.length, closed };
 }
 
-module.exports = { readFeeds, enrich, guessLocation, CLOSED };
+// Workday careers sites have no public GET feed, but Fetch renders their search results
+// page (?q=...) for free in seconds. Sites where that yields no job links go to the Agent.
+async function readWorkdayBoards(targets, p, tf, log, force) {
+  const place = p.places[0];
+  const queries = [p.role, place ? `${p.role} ${place}` : null].filter(Boolean);
+  const reqs = [];
+  for (const t of targets) for (const q of queries) reqs.push({ t, url: `${t.boardUrl}?q=${encodeURIComponent(q)}` });
+  const res = byRequestedUrl(await fetchChunks(tf, reqs.map((r) => r.url), {
+    ttl: force ? 0 : 3600,
+    perUrlTimeoutMs: 60000,
+    purpose: `Read job search results on each company's Workday careers site for ${p.role} roles`,
+  }));
+  const listings = [];
+  const report = [];
+  const needAgent = [];
+  for (const t of targets) {
+    const byUrl = new Map();
+    let zero = false;
+    for (const r of reqs.filter((x) => x.t === t)) {
+      const page = res.ok.get(r.url);
+      const text = page && typeof page.text === 'string' ? page.text : '';
+      if (/\b0\s+jobs?\s+found\b/i.test(text)) zero = true;
+      for (const item of workdayJobsFromMarkdown(text, t)) byUrl.set(item.url, item);
+    }
+    const items = [...byUrl.values()];
+    items.forEach((x) => { x.sources = ['fetch:workday']; });
+    listings.push(...items);
+    if (items.length || zero) report.push({ company: t.company, ats: 'workday', url: t.boardUrl, jobs: items.length, via: 'search page' });
+    else needAgent.push(t);
+  }
+  log('fetch', `Workday: ${plural(listings.length, 'job')} read by Fetch, ${plural(needAgent.length, 'site')} left for the Agent`);
+  return { listings, report, needAgent };
+}
+
+module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, CLOSED };

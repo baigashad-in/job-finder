@@ -23,7 +23,7 @@ function validateSchema(node, path = '#') {
 }
 
 function state() {
-  return { extraAcmeJob: false, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
+  return { extraAcmeJob: false, workdayPage: false, pendingMs: 0, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
 }
 
 function greenhouseFeed(st) {
@@ -91,6 +91,14 @@ function fetchOne(url, st) {
   if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/piedpiper')) return { text: ashbyPiedPiper() };
   if (url.startsWith('https://api.smartrecruiters.com/v1/companies/Hooli/postings')) return { text: smartHooli() };
   if (PAGES[url]) return { text: PAGES[url], title: PAGES[url].split('\n')[0].replace('# ', '') };
+  if (st.workdayPage && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
+    return { text: [
+      '# Umbrella Careers', '2 JOBS FOUND',
+      '[Software Engineer Intern](/en-US/External/job/New-York/Software-Engineer-Intern_R123)', 'Posted 3 Days Ago', 'R123',
+      '[Software Engineer Intern, Infrastructure](https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/Austin/Software-Engineer-Intern-Infra_R124)', 'Posted Yesterday',
+      '[Privacy policy](https://www.workday.com/privacy)',
+    ].join('\n') };
+  }
   return { error: 'page_not_found', status: 404 };
 }
 
@@ -179,7 +187,9 @@ function startMock(port = 0) {
         if (!run) return send(404, { error: 'not found' });
         if (m[2]) { st.calls.cancel++; return send(200, { run_id: m[1], status: 'CANCELLED' }); }
         st.calls.agentPoll++;
-        if (Date.now() - run.created < st.runDelayMs) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });
+        const age = Date.now() - run.created;
+        if (age < st.pendingMs) return send(200, { run_id: m[1], status: 'PENDING', result: null, streaming_url: null });
+        if (age - st.pendingMs < st.runDelayMs) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });
         return send(200, { run_id: m[1], status: 'COMPLETED', num_of_steps: 7, result: agentResult(run, st), error: null });
       }
       return send(404, { error: 'unknown route' });

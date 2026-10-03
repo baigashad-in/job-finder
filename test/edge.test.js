@@ -18,6 +18,22 @@ test('slow Agent runs are cancelled so they stop using credits', async (t) => {
   assert.equal(tf.stats.agent.failed, 1);
 });
 
+test('time waiting in the TinyFish queue does not count against the run limit', async (t) => {
+  const mock = await startMock();
+  t.after(() => mock.server.close());
+  process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
+  mock.st.pendingMs = 300; // queued for 300ms, then runs for 150ms
+  const { TinyFish } = require('../src/tinyfish');
+  const tf = new TinyFish({ apiKey: 'test-key' });
+  const run = await tf.agentRun({ url: 'https://careers.vandelay.com/jobs', goal: 'x' }, { maxWaitMs: 1000, pollMs: 50 });
+  assert.equal(run.status, 'COMPLETED');
+  process.env.AGENT_MAX_PENDING_SECONDS = '0.2';
+  const stuck = await tf.agentRun({ url: 'https://careers.vandelay.com/jobs', goal: 'x' }, { maxWaitMs: 1000, pollMs: 50 });
+  delete process.env.AGENT_MAX_PENDING_SECONDS;
+  assert.equal(stuck.status, 'CANCELLED');
+  assert.match(stuck.error.message, /Still queued/);
+});
+
 test('a bad API key gives a clear error', async (t) => {
   const mock = await startMock();
   t.after(() => mock.server.close());

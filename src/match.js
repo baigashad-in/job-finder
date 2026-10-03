@@ -56,6 +56,10 @@ const ROLE_FAMILIES = [
 // Words that mean the posting is a different job even if it mentions the role.
 const CONFLICT_WORDS = ['recruiter', 'recruiting', 'sourcer', 'talent acquisition', 'account executive', 'sales', 'marketing', 'counsel', 'attorney', 'paralegal', 'executive assistant'];
 
+const GENERIC_ROLE_WORDS = new Set(['engineer', 'developer', 'manager', 'analyst', 'specialist', 'associate',
+  'lead', 'scientist', 'designer', 'consultant', 'architect', 'administrator', 'coordinator', 'representative',
+  'officer', 'technician', 'assistant', 'intern', 'senior', 'junior', 'staff', 'principal', 'director', 'head']);
+
 function roleExpansions(role) {
   const rt = toks(role);
   const out = new Set();
@@ -83,8 +87,13 @@ function scoreRole(listing, p) {
   for (const ph of p.expansions) {
     if (hasPhrase(tt, toks(ph))) return { score: 32, reason: `related title "${ph}"` };
   }
-  const overlap = rt.filter((t) => tt.includes(t)).length / Math.max(rt.length, 1);
-  if (overlap >= 0.5) return { score: Math.round(30 * overlap), reason: 'title shares most role words' };
+  // Sharing only a generic word ("engineer", "manager") is not enough: "Support Engineer"
+  // is not a match for "software engineer". At least one specific word must match.
+  const hits = rt.filter((t) => tt.includes(t));
+  const overlap = hits.length / Math.max(rt.length, 1);
+  const specific = rt.some((t) => !GENERIC_ROLE_WORDS.has(t));
+  const specificHit = !specific || hits.some((t) => !GENERIC_ROLE_WORDS.has(t));
+  if (overlap >= 0.5 && specificHit) return { score: Math.round(30 * overlap), reason: 'title shares most role words' };
   return { score: 0, drop: true, reason: 'title does not match role' };
 }
 
@@ -98,7 +107,7 @@ function detectLevel(title, hint, roleText) {
       / (summer|fall|spring|winter) 20\d\d /.test(t)) return 'intern';
   if (/ (staff|principal|distinguished|fellow) /.test(t)) return 'staff';
   if (/ (director|head|vp|vice president|chief) /.test(t)) return 'manager';
-  if (!roleHasManager && / (engineering manager|manager|management) /.test(t) && !/ product manager /.test(t)) return 'manager';
+  if (!roleHasManager && / (engineering manager|manager) /.test(t) && !/ product manager /.test(t)) return 'manager';
   if (/ (senior|sr|lead|iii|iv) /.test(t)) return 'senior';
   if (/ (new grad|new graduate|graduate|grad|entry level|entry|junior|jr|early career|university|campus|associate) /.test(t) ||
       / (engineer|developer|scientist|analyst|designer) i /.test(t)) return 'entry';

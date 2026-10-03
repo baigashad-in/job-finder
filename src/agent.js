@@ -43,13 +43,15 @@ function buildGoal(p) {
   const searchText = [lvl, p.role].filter(Boolean).join(' ');
   const place = p.places[0] || '';
   return [
-    'Goal: list open job postings on this careers site that match the search below.',
+    'Goal: list open job postings on this careers site that match the search below. Work quickly.',
     `Search: role "${p.role}"${lvl ? `, level "${lvl}"` : ''}${place ? `, location "${place}"` : ''}${p.remoteOk ? ', remote is fine' : ''}.`,
     'Steps:',
     '1. Close any cookie or privacy banner.',
-    `2. If the page has a job search box, search for "${searchText}". If it has a location filter${place ? ` and "${place}" is an option, apply it` : ', leave it empty'}. Skip any filter that does not exist.`,
-    `3. Read the results list. Collect up to ${MAX_JOBS} postings whose title fits the role. Take title, location, posted date and link from the list itself. Open a posting only when the list hides its location.`,
-    '4. If results span several pages, read at most 2 pages.',
+    `2. If the page has a job search box, search for "${searchText}".`,
+    place
+      ? `3. If there is a simple location box or dropdown, set it to "${place}". If that takes more than two clicks, skip it.`
+      : '3. Do not use location filters.',
+    `4. Read only the first page of results. Collect up to ${MAX_JOBS} postings whose title fits the role. Take title, location, posted date and link from the list itself. Do not open postings.`,
     'Return: the company name, and for each posting its title, location as shown (or null), posted date text as shown (or null), department if shown (or null), and url, the full absolute link to the posting.',
     'Rules: copy text exactly as shown. Do not invent postings or links. If nothing matches, return an empty jobs list. If you hit a captcha, a login wall or an access denied page, stop and set blocked to true.',
   ].join('\n');
@@ -67,13 +69,16 @@ function findJobsArray(obj, depth = 0) {
 
 function parseAgentResult(run) {
   let r = run ? run.result : null;
+  const rawText = typeof r === 'string' ? r : '';
   if (typeof r === 'string') r = parseJsonText(r) || { raw: r };
   if (r && r.result && !r.jobs) r = typeof r.result === 'string' ? parseJsonText(r.result) : r.result;
   const jobs = (r && Array.isArray(r.jobs) ? r.jobs : findJobsArray(r)) || [];
-  const blob = `${JSON.stringify(r || '')} ${JSON.stringify((run && run.error) || '')}`.toLowerCase();
   const code = run && run.error && run.error.code;
-  const blocked = !!(r && r.blocked) || code === 'SITE_BLOCKED' ||
-    (!jobs.length && /captcha|access denied|are you a robot|bot detection|blocked/.test(blob));
+  // Look for block words only in error text and raw text answers. Searching the whole
+  // result would match the schema's own field name in {"blocked": false}.
+  const errText = `${JSON.stringify((run && run.error) || '')} ${rawText}`.toLowerCase();
+  const blocked = (r && r.blocked === true) || code === 'SITE_BLOCKED' ||
+    (!jobs.length && /captcha|access denied|are you a robot|bot detection|verify you are human/.test(errText));
   return { company: r && r.company ? String(r.company) : null, blocked, jobs: jobs.filter((j) => j && j.title && j.url) };
 }
 
@@ -123,7 +128,7 @@ function runBody(target, goal, stealth, country) {
 async function runAgents(targets, p, tf, log, warnings, force, store) {
   const report = [];
   const goal = buildGoal(p);
-  const lists = await pool(targets, 3, async (t) => {
+  const lists = await pool(targets, 2, async (t) => {
     const host = (safeUrl(t.url) || {}).hostname || t.url;
     const cacheKey = store.hash(`${t.url}|${goal}`);
     if (!force) {

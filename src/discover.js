@@ -32,6 +32,8 @@ function cleanSearchTitle(t) {
     .replace(/^job application for\s+/i, '')
     .split(/\s+\|\s+/)[0]
     .replace(/\s+at\s+[A-Z0-9][\w&.' ]{1,40}$/, '')
+    // "Software Engineer - Myworkdayjobs.com", "Software Engineer - PTC Careers"
+    .replace(/\s+[-\u2013]\s+(myworkdayjobs\.com|workday|[^-\u2013]{0,40}\bcareers?)$/i, '')
     .trim();
 }
 
@@ -40,12 +42,14 @@ function addHit(acc, r, from) {
   if (!d) return;
   const key = `${d.ats}:${d.token}`;
   if (d.kind === 'feed') {
+    const isNew = !acc.boards.has(key);
     const b = acc.boards.get(key) || { ...d, hits: 0, company: null, from };
     b.hits++;
     b.company = b.company || companyFromTitle(r.title);
     acc.boards.set(key, b);
-    return;
+    return isNew;
   }
+  const isNew = !acc.agentTargets.has(key);
   const t = acc.agentTargets.get(key) || { ...d, url: d.boardUrl, hits: 0, company: null, from };
   t.hits++;
   t.company = t.company || companyFromTitle(r.title) || prettyName(d.token);
@@ -57,6 +61,7 @@ function addHit(acc, r, from) {
       company: t.company, ats: d.ats, postedAt: toIso(r.date),
     });
   }
+  return isNew;
 }
 
 function slugOf(s) {
@@ -172,9 +177,9 @@ async function discover(p, tf, log, warnings) {
           recency_minutes: q.recency_minutes,
           purpose: `Find open ${p.role} job postings on company job boards`,
         });
-        const before = acc.boards.size + acc.agentTargets.size;
-        for (const r of results) addHit(acc, r, 'search');
-        log('search', `"${q.query}" (${q.label}): ${plural(results.length, 'hit')}, ${plural(acc.boards.size + acc.agentTargets.size - before, 'new board')}`);
+        let added = 0;
+        for (const r of results) if (addHit(acc, r, 'search')) added++;
+        log('search', `"${q.query}" (${q.label}): ${plural(results.length, 'hit')}, ${plural(added, 'new board')}`);
       } catch (err) {
         warnings.push(`Search "${q.query}" failed: ${err.message}`);
       }

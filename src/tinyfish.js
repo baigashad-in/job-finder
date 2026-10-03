@@ -124,7 +124,9 @@ class TinyFish {
     return out;
   }
 
-  // Agent API. Starts an async run, polls until it finishes, cancels it if it runs too long.
+  // Agent API. Starts an async run and polls it. The time limit counts from when the run
+  // starts RUNNING, so time spent queued (PENDING) behind other runs does not use it up.
+  // Runs that take too long, or stay queued too long, are cancelled so they stop using credits.
   async agentRun(body, { maxWaitMs = 180000, pollMs = Number(process.env.AGENT_POLL_MS || 4000), onProgress, onStream } = {}) {
     this.stats.agent.runs++;
     const start = await this._request(`${this.agentUrl}/v1/automation/run-async`, {
@@ -135,11 +137,15 @@ class TinyFish {
       this.stats.agent.failed++;
       throw new TinyFishError(`Agent run was not created: ${JSON.stringify(start && start.error)}`, 0, start);
     }
-    const deadline = Date.now() + maxWaitMs;
+    const maxPendingMs = Number(process.env.AGENT_MAX_PENDING_SECONDS || 180) * 1000;
+    const queuedAt = Date.now();
+    let runningSince = null;
     let lastStatus = '';
     let streamSent = false;
-    while (Date.now() < deadline) {
+    for (;;) {
       await sleep(pollMs);
+      const now = Date.now();
+      if (runningSince === null ? now - queuedAt > maxPendingMs : now - runningSince > maxWaitMs) break;
       let run;
       try {
         run = await this._request(`${this.agentUrl}/v1/runs/${encodeURIComponent(runId)}`, { timeoutMs: 20000 });
@@ -147,27 +153,31 @@ class TinyFish {
         this.log(`Polling run ${runId} failed once: ${err.message}`);
         continue;
       }
-      if (run && run.streaming_url && !streamSent && onStream) {
+      if (!run) continue;
+      if (runningSince === null && run.status !== 'PENDING') runningSince = Date.now();
+      if (run.streaming_url && !streamSent && onStream) {
         streamSent = true; // live browser view, only valid while the run is going
         onStream(run.streaming_url);
       }
-      if (run && run.status !== lastStatus) {
+      if (run.status !== lastStatus) {
         lastStatus = run.status;
         if (onProgress) onProgress(run.status, run);
       }
-      if (run && ['COMPLETED', 'FAILED', 'CANCELLED'].includes(run.status)) {
+      if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(run.status)) {
         if (run.num_of_steps) this.stats.agent.steps += run.num_of_steps;
         if (run.status === 'COMPLETED') this.stats.agent.completed++;
         else this.stats.agent.failed++;
         return run;
       }
     }
-    // Too slow: cancel so it stops using credits.
     try {
       await this._request(`${this.agentUrl}/v1/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', timeoutMs: 15000, retries: 0 });
     } catch { /* best effort */ }
     this.stats.agent.failed++;
-    return { run_id: runId, status: 'CANCELLED', result: null, error: { message: `Stopped after ${Math.round(maxWaitMs / 1000)}s` } };
+    const why = runningSince === null
+      ? `Still queued after ${Math.round(maxPendingMs / 1000)}s`
+      : `Stopped after ${Math.round(maxWaitMs / 1000)}s`;
+    return { run_id: runId, status: 'CANCELLED', result: null, error: { message: why } };
   }
 }
 

@@ -59,7 +59,6 @@ test('full pipeline against mock TinyFish', async (t) => {
       'Acme Robotics | Software Engineer Intern, Summer 2027',
       'Globex | Backend Software Engineer Intern',
       'Hooli | Software Engineer Intern',
-      'Initech | ML Engineer Intern',
       'Pied Piper | Software Engineer Intern (Compression)',
       'Umbrella | Software Engineer Intern',
     ];
@@ -68,7 +67,7 @@ test('full pipeline against mock TinyFish', async (t) => {
 
   await t.test('filters with the right reasons', () => {
     assert.equal(r1.filteredOut.level, 3, 'senior acme, new grad initech, hooli mid');
-    assert.ok(r1.filteredOut.role >= 2, 'recruiter and designer');
+    assert.equal(r1.filteredOut.role, 3, 'recruiter, designer, and ML engineer (shares only "engineer")');
     assert.ok(r1.filteredOut.location >= 3, 'SF, London, Austin');
     assert.equal(r1.filteredOut.visa, 3, 'globex no-sponsor, acme clearance, vandelay 43');
     assert.equal(r1.filteredOut.fresh, 1, '60 day old posting');
@@ -93,7 +92,7 @@ test('full pipeline against mock TinyFish', async (t) => {
 
   await t.test('ranking puts strong matches first and links are http(s)', () => {
     assert.ok(r1.listings[0].score >= r1.listings[r1.listings.length - 1].score);
-    assert.equal(r1.listings[r1.listings.length - 1].company, 'Initech');
+    assert.equal(r1.listings.length, 5);
     for (const l of r1.listings) assert.match(l.applyUrl, /^https:\/\//);
     assert.ok(!r1.listings.some((l) => /javascript/.test(l.applyUrl)));
     assert.equal(r1.firstRun, true);
@@ -132,6 +131,19 @@ test('full pipeline against mock TinyFish', async (t) => {
   await t.test('AGENT_RUNS_LIMIT caps Agent runs whatever the user asks for', () => {
     assert.equal(r6.agentSites.length, 1);
     assert.ok(r6.warnings.some((w) => /at most 1 Agent run per search/.test(w)));
+  });
+
+  mock.st.workdayPage = true;
+  const r7 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
+  mock.st.workdayPage = false;
+  await t.test('Workday is read by Fetch first, so the Agent only runs where Fetch failed', () => {
+    assert.equal(r7.usage.agent.runs, 1, 'only Vandelay (custom site) needs the Agent');
+    const um = r7.listings.find((l) => l.company === 'Umbrella');
+    assert.ok(um.sources.includes('fetch:workday'));
+    const row = r7.boards.find((b) => b.ats === 'workday');
+    assert.equal(row.jobs, 2, 'same 2 jobs on both query pages, counted once');
+    assert.equal(row.via, 'search page');
+    assert.ok(!r7.listings.some((l) => /Infrastructure/.test(l.title)), 'Austin job filtered by location');
   });
 
   const r5 = await runPipeline({ ...PREFS, role: 'data analyst', seniority: 'any', visa: 'any', locations: '', companies: '', maxAgentRuns: 0 }, { tf: new TinyFish(), store });

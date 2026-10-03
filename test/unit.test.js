@@ -1,7 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { detectAts, parseJsonText, htmlToText, companyFromTitle } = require('../src/ats');
+const { detectAts, parseJsonText, htmlToText, companyFromTitle, workdayJobsFromMarkdown, prettyName } = require('../src/ats');
+const { parseAgentResult } = require('../src/agent');
+const { cleanSearchTitle } = require('../src/discover');
 const { detectLevel, detectVisa, scoreLocation, normalizePrefs, dedupe, canonicalUrl, evaluate } = require('../src/match');
 const { parsePostedText } = require('../src/util');
 const { OUTPUT_SCHEMA } = require('../src/agent');
@@ -47,6 +49,7 @@ test('detects seniority from titles', () => {
   assert.equal(detectLevel('Senior Software Engineer'), 'senior');
   assert.equal(detectLevel('Staff Engineer'), 'staff');
   assert.equal(detectLevel('Engineering Manager, Payments'), 'manager');
+  assert.equal(detectLevel('Intermediate Backend Engineer - Database Change Management'), 'mid');
   assert.equal(detectLevel('Associate Product Manager', null, 'product manager'), 'entry');
   assert.equal(detectLevel('Product Manager', null, 'product manager'), 'unspecified');
 });
@@ -85,6 +88,40 @@ test('role matching drops recruiters and unrelated titles', () => {
   assert.match(evaluate({ ...base, title: 'Technical Recruiter, Software Engineering Interns' }, p).dropped, /^role/);
   assert.match(evaluate({ ...base, title: 'Product Design Intern' }, p).dropped, /^role/);
   assert.match(evaluate({ ...base, title: 'Senior Software Engineer' }, p).dropped, /^level/);
+  const any = normalizePrefs({ role: 'software engineer' });
+  for (const t of ['Engineering Manager', 'Senior Support Engineer', 'Prompt Engineer', 'Staff Engineer - Databricks']) {
+    assert.match(evaluate({ ...base, title: t }, any).dropped, /^role/, t);
+  }
+  assert.equal(evaluate({ ...base, title: 'Software Development Engineer in Test' }, any).dropped, null);
+  assert.equal(evaluate({ ...base, title: 'Engineering Manager' }, normalizePrefs({ role: 'engineering manager' })).dropped, null);
+});
+
+test('Agent results are only "blocked" when they say so', () => {
+  assert.equal(parseAgentResult({ status: 'COMPLETED', result: { blocked: false, jobs: [] } }).blocked, false);
+  assert.equal(parseAgentResult({ status: 'COMPLETED', result: { blocked: true, jobs: [] } }).blocked, true);
+  assert.equal(parseAgentResult({ status: 'COMPLETED', result: 'Stopped: captcha on page' }).blocked, true);
+  assert.equal(parseAgentResult({ status: 'FAILED', result: null, error: { code: 'SITE_BLOCKED' } }).blocked, true);
+});
+
+test('reads Workday search results pages', () => {
+  const md = '3 JOBS FOUND\n[**Software Engineer**](/en-US/Site/job/Bangalore-India/SWE_R1)\n2 Locations\nPosted 3 Days Ago\n' +
+    '[SWE](/en-US/Site/job/Bangalore-India/SWE_R1)\n[Senior SWE](https://acme.wd5.myworkdayjobs.com/en-US/Site/job/Remote-USA/Senior_R2)\n' +
+    '[Privacy](https://www.acme.com/privacy)\n[Search](/en-US/Site?q=x)';
+  const jobs = workdayJobsFromMarkdown(md, { boardUrl: 'https://acme.wd5.myworkdayjobs.com/en-US/Site', token: 'acme', company: 'Acme' });
+  assert.equal(jobs.length, 2, 'duplicates and non-job links skipped');
+  assert.equal(jobs[0].title, 'Software Engineer');
+  assert.equal(jobs[0].location, 'Bangalore India (+1 more)');
+  assert.ok(jobs[0].postedAt);
+  assert.equal(jobs[1].remote, true);
+  assert.equal(jobs[0].url, 'https://acme.wd5.myworkdayjobs.com/en-US/Site/job/Bangalore-India/SWE_R1');
+});
+
+test('cleans search titles and company codes', () => {
+  assert.equal(cleanSearchTitle('Software Engineer-Salesforce - PTC Careers'), 'Software Engineer-Salesforce');
+  assert.equal(cleanSearchTitle('Principal Software Engineer - Logo - Myworkdayjobs.com'), 'Principal Software Engineer - Logo');
+  assert.equal(cleanSearchTitle('Software Engineer - Careers Platform'), 'Software Engineer - Careers Platform');
+  assert.equal(prettyName('cba'), 'CBA');
+  assert.equal(prettyName('scale-ai'), 'Scale Ai');
 });
 
 test('dedupes by URL and by company + title + location', () => {

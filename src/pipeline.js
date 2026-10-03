@@ -9,7 +9,7 @@
 
 const { normalizePrefs, evaluate, dedupe, LEVEL_LABEL } = require('./match');
 const { discover } = require('./discover');
-const { readFeeds, enrich } = require('./read');
+const { readFeeds, readWorkdayBoards, enrich } = require('./read');
 const { runAgents } = require('./agent');
 const { plural } = require('./util');
 
@@ -46,10 +46,19 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const feeds = await readFeeds(useBoards, p, tf, log, warnings, force);
   log('fetch', `Boards returned ${plural(feeds.listings.length, 'open job')} in total`);
 
-  // 3. Agent for sites without a feed
-  const useTargets = targets.slice(0, p.maxAgentRuns);
-  if (targets.length > useTargets.length) {
-    warnings.push(`Skipped ${plural(targets.length - useTargets.length, 'careers site')} because Agent runs are capped at ${p.maxAgentRuns}. Raise the cap to include them.`);
+  // 3a. Workday: Fetch the search results page first (free). Only failures go to the Agent.
+  const workday = targets.filter((t) => t.ats === 'workday').slice(0, MAX_BOARDS);
+  let wd = { listings: [], report: [], needAgent: [] };
+  if (workday.length) {
+    log('step', `Reading ${plural(workday.length, 'Workday site')} with TinyFish Fetch`);
+    wd = await readWorkdayBoards(workday, p, tf, log, force);
+  }
+
+  // 3b. Agent for sites Fetch could not read
+  const agentQueue = targets.filter((t) => t.ats !== 'workday' || wd.needAgent.includes(t));
+  const useTargets = agentQueue.slice(0, p.maxAgentRuns);
+  if (agentQueue.length > useTargets.length) {
+    warnings.push(`Skipped ${plural(agentQueue.length - useTargets.length, 'careers site')} because Agent runs are capped at ${p.maxAgentRuns}. Raise the cap to include them.`);
   }
   let agent = { listings: [], agentReport: [] };
   if (useTargets.length) {
@@ -65,7 +74,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   }));
 
   // 4. Dedupe
-  const raw = [...feeds.listings, ...agent.listings, ...singles];
+  const raw = [...feeds.listings, ...wd.listings, ...agent.listings, ...singles];
   const { listings, removed } = dedupe(raw);
   log('step', `Matching ${plural(listings.length, 'unique job')} (${plural(removed, 'duplicate')} merged)`);
 
@@ -136,7 +145,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
       pagesRead: enr.read,
     },
     filteredOut: drops,
-    boards: feeds.boardReport,
+    boards: [...feeds.boardReport, ...wd.report],
     agentSites: agent.agentReport,
     usage: JSON.parse(JSON.stringify(tf.stats)),
     warnings,

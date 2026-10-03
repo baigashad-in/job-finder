@@ -11,6 +11,8 @@ const FEED_DOMAINS = [
   'boards.greenhouse.io', 'job-boards.greenhouse.io', 'jobs.lever.co',
   'jobs.ashbyhq.com', 'jobs.smartrecruiters.com',
 ];
+const { parsePostedText } = require('./util');
+
 const AGENT_DOMAINS = ['myworkdayjobs.com', 'apply.workable.com'];
 const ATS_DOMAINS = [...FEED_DOMAINS, ...AGENT_DOMAINS];
 
@@ -123,7 +125,9 @@ function htmlToText(html) {
 }
 
 function prettyName(token) {
-  return String(token || '')
+  const t = String(token || '');
+  if (/^[a-z0-9]{2,3}$/i.test(t)) return t.toUpperCase(); // cba -> CBA, ptc -> PTC
+  return t
     .split(/[-_\s]+/)
     .filter(Boolean)
     .map((w) => w[0].toUpperCase() + w.slice(1))
@@ -304,8 +308,46 @@ function jobLinksFromMarkdown(markdown, board) {
   return out;
 }
 
+// Workday search results page read by Fetch (https://x.wd5.myworkdayjobs.com/en-US/Site?q=...).
+// Job links look like /en-US/Site/job/Bangalore-India/Software-Engineer_R123, absolute or relative.
+// The path segment after /job/ is the job's main location.
+function workdayJobsFromMarkdown(markdown, target) {
+  const text = String(markdown || '');
+  const links = [...text.matchAll(/\[([^\]]{3,200})\]\(([^)\s]+)\)/g)];
+  const out = [];
+  const seen = new Set();
+  links.forEach((m, i) => {
+    let u;
+    try { u = new URL(m[2], target.boardUrl || target.url); } catch { return; }
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.endsWith('.myworkdayjobs.com')) return;
+    const parts = u.pathname.split('/').filter(Boolean);
+    const j = parts.indexOf('job');
+    if (j < 0 || parts.length < j + 3) return;
+    const url = `${u.origin}${u.pathname}`;
+    if (seen.has(url.toLowerCase())) return;
+    seen.add(url.toLowerCase());
+    const end = i + 1 < links.length ? links[i + 1].index : m.index + m[0].length + 400;
+    const after = text.slice(m.index + m[0].length, end);
+    const posted = after.match(/posted[^\n|]{0,40}/i);
+    const more = after.match(/\b(\d+)\s+locations\b/i);
+    let location;
+    try { location = decodeURIComponent(parts[j + 1]); } catch { location = parts[j + 1]; }
+    location = location.replace(/[-_]+/g, ' ').trim();
+    if (more && Number(more[1]) > 1) location = `${location} (+${Number(more[1]) - 1} more)`;
+    out.push({
+      title: m[1].replace(/[*_`#\\]/g, '').replace(/\s+/g, ' ').trim(),
+      company: target.company || prettyName(target.token),
+      location, locations: [location], remote: /\bremote\b/i.test(location) ? true : null, workplace: null,
+      postedAt: posted ? parsePostedText(posted[0]) : null,
+      url, applyUrl: url, department: null, employmentType: null, salary: null,
+      description: '', levelHint: null, ats: 'workday',
+    });
+  });
+  return out;
+}
+
 module.exports = {
   FEED_DOMAINS, AGENT_DOMAINS, ATS_DOMAINS, PARSERS,
   detectAts, htmlToText, decodeEntities, prettyName, companyFromTitle, parseJsonText,
-  jobLinksFromMarkdown, toIso, clip, safeUrl,
+  jobLinksFromMarkdown, workdayJobsFromMarkdown, toIso, clip, safeUrl,
 };
