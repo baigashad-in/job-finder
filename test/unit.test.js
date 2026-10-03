@@ -1,0 +1,124 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { detectAts, parseJsonText, htmlToText, companyFromTitle } = require('../src/ats');
+const { detectLevel, detectVisa, scoreLocation, normalizePrefs, dedupe, canonicalUrl, evaluate } = require('../src/match');
+const { parsePostedText } = require('../src/util');
+const { OUTPUT_SCHEMA } = require('../src/agent');
+const { validateSchema } = require('./mock-tinyfish');
+
+test('detects ATS boards and feed URLs', () => {
+  const gh = detectAts('https://job-boards.greenhouse.io/acme/jobs/123?gh_src=x');
+  assert.equal(gh.ats, 'greenhouse');
+  assert.equal(gh.token, 'acme');
+  assert.equal(gh.jobId, '123');
+  assert.equal(gh.feedUrl, 'https://boards-api.greenhouse.io/v1/boards/acme/jobs?content=true');
+  assert.equal(detectAts('https://boards.greenhouse.io/embed/job_board?for=acme').token, 'acme');
+  assert.equal(detectAts('https://jobs.lever.co/globex/abc').feedUrl, 'https://api.lever.co/v0/postings/globex?mode=json');
+  assert.equal(detectAts('https://jobs.eu.lever.co/globex/abc').feedUrl, 'https://api.eu.lever.co/v0/postings/globex?mode=json');
+  assert.equal(detectAts('https://jobs.ashbyhq.com/initech/i1').ats, 'ashby');
+  const wd = detectAts('https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/SWE_R1');
+  assert.equal(wd.kind, 'agent');
+  assert.equal(wd.boardUrl, 'https://umbrella.wd5.myworkdayjobs.com/en-US/External');
+  assert.equal(detectAts('https://www.linkedin.com/jobs/view/1'), null);
+  assert.equal(detectAts('javascript:alert(1)'), null);
+});
+
+test('parses JSON that Fetch may wrap or escape', () => {
+  assert.deepEqual(parseJsonText('{"a":1}'), { a: 1 });
+  assert.deepEqual(parseJsonText('```json\n[{"a":1}]\n```'), [{ a: 1 }]);
+  assert.deepEqual(parseJsonText('{"first\\_published":"x"}'), { first_published: 'x' });
+  assert.deepEqual(parseJsonText('Here you go: {"a":"b\\nc"} done'), { a: 'b\nc' });
+  assert.equal(parseJsonText('<html>nope</html>'), null);
+});
+
+test('cleans escaped Greenhouse HTML', () => {
+  assert.equal(htmlToText('&lt;p&gt;Hello &amp;amp; &lt;b&gt;bye&lt;/b&gt;&lt;/p&gt;'), 'Hello & bye');
+  assert.equal(companyFromTitle('Job Application for Software Engineer at Acme Robotics'), 'Acme Robotics');
+});
+
+test('detects seniority from titles', () => {
+  assert.equal(detectLevel('Software Engineer Intern, Summer 2027'), 'intern');
+  assert.equal(detectLevel('Software Engineer (Summer 2027)'), 'intern');
+  assert.equal(detectLevel('Internal Tools Engineer'), 'unspecified');
+  assert.equal(detectLevel('Software Engineer, New Grad'), 'entry');
+  assert.equal(detectLevel('Software Engineer I'), 'entry');
+  assert.equal(detectLevel('Software Engineer II'), 'mid');
+  assert.equal(detectLevel('Senior Software Engineer'), 'senior');
+  assert.equal(detectLevel('Staff Engineer'), 'staff');
+  assert.equal(detectLevel('Engineering Manager, Payments'), 'manager');
+  assert.equal(detectLevel('Associate Product Manager', null, 'product manager'), 'entry');
+  assert.equal(detectLevel('Product Manager', null, 'product manager'), 'unspecified');
+});
+
+test('detects visa policy and ignores application questions', () => {
+  assert.equal(detectVisa('We are unable to sponsor visas for this role.').status, 'no');
+  assert.equal(detectVisa('Candidates must be authorized to work without the need for current or future visa sponsorship.').status, 'no');
+  assert.equal(detectVisa('We are unable to sponsor at this time.').status, 'no');
+  assert.equal(detectVisa('Requires an active Secret clearance.').status, 'no');
+  assert.equal(detectVisa('Visa sponsorship is available.').status, 'yes');
+  assert.equal(detectVisa('We will provide visa sponsorship for eligible candidates.').status, 'yes');
+  assert.equal(detectVisa('Are you authorized to work in the US without sponsorship? We support OPT.').status, 'opt');
+  assert.equal(detectVisa('Will you now or in the future require sponsorship?').status, 'unknown');
+  assert.equal(detectVisa('We do not discriminate based on immigration status.').status, 'unknown');
+  assert.match(detectVisa('Great team. We are unable to sponsor visas. Apply now.').evidence, /unable to sponsor/);
+});
+
+test('matches locations, aliases, countries and remote', () => {
+  const p = normalizePrefs({ role: 'swe', locations: 'NYC; Remote', country: 'US' });
+  assert.equal(scoreLocation({ location: 'New York, NY' }, p).score, 20);
+  assert.equal(scoreLocation({ location: 'Remote' }, p).score, 18);
+  assert.match(scoreLocation({ location: 'Remote - Canada' }, p).reason, /limited to CA/);
+  assert.ok(scoreLocation({ location: 'Austin, TX' }, p).drop);
+  const us = normalizePrefs({ role: 'swe', locations: 'United States' });
+  assert.ok(scoreLocation({ location: 'Austin, TX' }, us).score > 0);
+  assert.ok(scoreLocation({ location: 'Toronto, ON' }, us).drop);
+  const city = normalizePrefs({ role: 'swe', locations: 'New York, NY' });
+  assert.equal(scoreLocation({ location: 'Brooklyn' }, city).score, 20);
+});
+
+test('role matching drops recruiters and unrelated titles', () => {
+  const p = normalizePrefs({ role: 'software engineer', seniority: 'intern' });
+  const base = { company: 'X', location: null, description: '', postedAt: null };
+  assert.equal(evaluate({ ...base, title: 'Software Engineer Intern' }, p).dropped, null);
+  assert.equal(evaluate({ ...base, title: 'Backend Engineer Intern' }, p).dropped, null);
+  assert.match(evaluate({ ...base, title: 'Technical Recruiter, Software Engineering Interns' }, p).dropped, /^role/);
+  assert.match(evaluate({ ...base, title: 'Product Design Intern' }, p).dropped, /^role/);
+  assert.match(evaluate({ ...base, title: 'Senior Software Engineer' }, p).dropped, /^level/);
+});
+
+test('dedupes by URL and by company + title + location', () => {
+  const a = { title: 'SWE Intern', company: 'Acme', location: 'NYC', url: 'https://jobs.lever.co/acme/1', sources: ['fetch:lever'], description: 'long '.repeat(60) };
+  const b = { title: 'SWE Intern', company: 'Acme', location: 'NYC', url: 'https://jobs.lever.co/acme/1/apply?src=x', sources: ['search'] };
+  const c = { title: 'SWE  intern', company: 'ACME', location: 'NYC', url: 'https://acme.com/careers/1', sources: ['agent:custom'] };
+  const d = { title: 'SWE Intern', company: 'Acme', location: 'Boston', url: 'https://jobs.lever.co/acme/2', sources: ['fetch:lever'] };
+  const { listings, removed } = dedupe([a, b, c, d]);
+  assert.equal(listings.length, 2);
+  assert.equal(removed, 2);
+  assert.deepEqual(listings[0].sources.sort(), ['agent:custom', 'fetch:lever', 'search']);
+  assert.ok(listings[0].description.length > 200, 'keeps the richest copy');
+  assert.equal(canonicalUrl('https://acme.com/careers?gh_jid=55&utm=1'), 'acme.com/careers?gh_jid=55');
+});
+
+test('parses posted date text', () => {
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  assert.equal(parsePostedText('Posted 3 Days Ago', now).slice(0, 10), '2026-09-30');
+  assert.equal(parsePostedText('Posted Yesterday', now).slice(0, 10), '2026-10-02');
+  assert.equal(parsePostedText('Posted 30+ Days Ago', now).slice(0, 10), '2026-09-03');
+  assert.equal(parsePostedText('2026-09-28', now).slice(0, 10), '2026-09-28');
+  assert.equal(parsePostedText('whenever', now), null);
+});
+
+test('Agent output schema only uses keywords TinyFish accepts', () => {
+  assert.doesNotThrow(() => validateSchema(OUTPUT_SCHEMA));
+});
+
+test('prefs are validated and capped', () => {
+  assert.throws(() => normalizePrefs({ role: '' }), /Add a role/);
+  const p = normalizePrefs({ role: 'x', maxAgentRuns: 99, postedWithinDays: -5, seniority: 'wizard', locations: 'Remote' });
+  assert.equal(p.maxAgentRuns, 6);
+  assert.equal(p.postedWithinDays, 0);
+  assert.equal(p.seniority, 'any');
+  assert.equal(p.remoteOk, true);
+  assert.deepEqual(p.places, []);
+});
