@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Job finder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐟</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F6F6F2; --panel: #FFFFFF; --ink: #1D2430; --muted: #5E6672; --line: #DCDDD5;
+  --accent: #0F6E66; --accent-ink: #FFFFFF; --accent-soft: #DCEFEC; --new: #F2C14E; --new-ink: #3A2C00;
+  --bad: #A8432A; --bad-soft: #F6E3DC; --good: #2D6A3E; --good-soft: #E0EFE3;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #15191E; --panel: #1C2128; --ink: #E7E9E4; --muted: #A2A9B2; --line: #313842;
+    --accent: #4FC1B4; --accent-ink: #062521; --accent-soft: #1D3633; --new: #E8B83A; --new-ink: #2A1F00;
+    --bad: #F0957B; --bad-soft: #3A2620; --good: #8FD3A0; --good-soft: #1F3326;
+  }
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 28px; }
+.brand { font: 600 1.05rem var(--display); }
+.keystate { font-size: .875rem; color: var(--muted); }
+.keystate.bad { color: var(--bad); }
+
+/* The sentence: the one bold element on the page */
+.sentence { font: 400 clamp(1.5rem, 3.6vw, 2.5rem)/1.45 var(--display); letter-spacing: -0.01em; margin: 0 0 18px; max-width: 30em; }
+.sentence input, .sentence select {
+  font: 600 1em var(--display); color: var(--accent); background: transparent; border: 0;
+  border-bottom: 2px solid var(--line); padding: 0 2px; margin: 0 2px; min-width: 4ch;
+  appearance: none; -webkit-appearance: none; border-radius: 0;
+}
+.sentence select { padding-right: 4px; cursor: pointer; }
+.sentence input:hover, .sentence select:hover { border-bottom-color: var(--accent); }
+.sentence input:focus, .sentence select:focus { outline: none; border-bottom-color: var(--accent); background: var(--accent-soft); }
+.sentence input::placeholder { color: var(--muted); opacity: .6; font-weight: 400; }
+#role { width: 11ch; } #locations { width: 13ch; }
+
+details.more { margin: 8px 0 18px; }
+details.more summary { cursor: pointer; color: var(--muted); font-size: .95rem; width: fit-content; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 20px; margin-top: 14px; max-width: 900px; }
+.field label { display: block; font-size: .875rem; font-weight: 700; margin-bottom: 4px; }
+.field .hint { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+.field input, .field select, .field textarea {
+  width: 100%; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 8px 10px;
+}
+.field textarea { min-height: 84px; resize: vertical; }
+.check { display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 700 1rem var(--body); border-radius: 6px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: progress; }
+button.link { border: 0; background: none; padding: 4px 6px; color: var(--accent); font-weight: 700; }
+.err { color: var(--bad); margin: 10px 0 0; }
+
+.saved { margin: 30px 0 0; }
+.saved h2, .section h2 { font: 600 1.15rem var(--display); margin: 0 0 10px; }
+.saved ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.saved li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 220px; }
+.saved .name { font-weight: 700; }
+.saved .meta { font-size: .85rem; color: var(--muted); }
+
+.progress { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.progress h2 { font: 600 1.05rem var(--display); margin: 0 0 8px; }
+.progress ol { margin: 0; padding-left: 0; list-style: none; max-height: 240px; overflow: auto; font-size: .9rem; }
+.progress li { padding: 2px 0; color: var(--muted); }
+.progress li.step { color: var(--ink); font-weight: 700; margin-top: 6px; }
+.progress li.step .kind { display: none; }
+.progress li .kind { display: inline-block; min-width: 4.5em; font-weight: 700; color: var(--accent); }
+.progress li.warn .kind, .progress li.error .kind { color: var(--bad); }
+
+.summary { margin: 34px 0 6px; font: 400 1.2rem/1.4 var(--display); max-width: 46em; }
+.usage { color: var(--muted); font-size: .9rem; margin-bottom: 14px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 2; }
+.toolbar input[type=search], .toolbar select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+.toolbar input[type=search] { min-width: 200px; flex: 1 1 200px; }
+.toolbar .count { color: var(--muted); font-size: .9rem; margin-left: auto; }
+
+ol.jobs { list-style: none; padding: 0; margin: 0; }
+li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.score { font: 800 2.1rem/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; display: flex; gap: 8px; align-items: stretch; }
+.score .meter { width: 5px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; min-height: 2.1rem; }
+.score .meter span { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; }
+.score.hi { color: var(--accent); } .score.mid { color: var(--ink); } .score.lo { color: var(--muted); }
+.jt { font: 600 1.15rem/1.3 var(--display); margin: 0; }
+.jt a { color: var(--ink); text-decoration: none; }
+.jt a:hover { text-decoration: underline; }
+.jm { color: var(--muted); margin-top: 2px; }
+.jm strong { color: var(--ink); font-weight: 700; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); white-space: nowrap; }
+.chip.new { background: var(--new); color: var(--new-ink); border-color: var(--new); font-weight: 700; }
+.chip.visa-yes, .chip.visa-opt { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.chip.visa-no { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.why { font-size: .9rem; color: var(--muted); margin-top: 6px; }
+.job details { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+.job details summary { cursor: pointer; width: fit-content; }
+.apply { align-self: center; }
+.apply a { display: inline-block; font-weight: 700; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); text-decoration: none; white-space: nowrap; }
+.apply a:hover { background: var(--accent); color: var(--accent-ink); }
+
+.empty { padding: 28px 0; max-width: 40em; }
+.section { margin-top: 36px; }
+.section table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.section th, .section td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.section th { font-weight: 700; }
+.tablewrap { overflow-x: auto; }
+.filtered { color: var(--muted); font-size: .9rem; margin: 12px 0 0; }
+.warnings { color: var(--bad); font-size: .9rem; padding-left: 18px; }
+
+@media (max-width: 640px) {
+  li.job { grid-template-columns: 54px 1fr; }
+  .score { font-size: 1.6rem; }
+  .apply { grid-column: 2; justify-self: start; margin-top: 6px; }
+  .toolbar .count { margin-left: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  li.job.fresh { animation: arrive .5s ease-out both; }
+  @keyframes arrive { from { background: var(--accent-soft); } to { background: transparent; } }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">Job finder</div>
+    <div class="keystate" id="keystate">Checking setup</div>
+  </header>
+
+  <form id="form" autocomplete="off" novalidate>
+    <p class="sentence">
+      Find
+      <label class="sr" for="role">Role</label><input id="role" name="role" placeholder="software engineer" required>
+      roles at
+      <label class="sr" for="seniority">Level</label>
+      <select id="seniority" name="seniority">
+        <option value="any">any</option>
+        <option value="intern">intern</option>
+        <option value="entry">new grad</option>
+        <option value="mid">mid</option>
+        <option value="senior">senior</option>
+        <option value="staff">staff+</option>
+        <option value="manager">manager</option>
+      </select>
+      level in
+      <label class="sr" for="locations">Locations, separated by semicolons</label><input id="locations" name="locations" placeholder="New York; Remote">,
+      and I
+      <label class="sr" for="visa">Visa sponsorship</label>
+      <select id="visa" name="visa">
+        <option value="any">don't need</option>
+        <option value="need">need</option>
+      </select>
+      visa sponsorship.
+    </p>
+
+    <details class="more" id="more">
+      <summary>More options: companies, keywords, freshness</summary>
+      <div class="grid">
+        <div class="field">
+          <label for="companies">Companies to always check</label>
+          <textarea id="companies" placeholder="Stripe&#10;Figma&#10;https://careers.example.com"></textarea>
+          <div class="hint">One per line. Names or careers page URLs.</div>
+        </div>
+        <div class="field">
+          <label for="keywords">Keywords that should rank higher</label>
+          <input id="keywords" placeholder="python, backend, payments">
+          <div class="field" style="margin-top:12px">
+            <label for="exclude">Hide jobs that mention</label>
+            <input id="exclude" placeholder="clearance, unpaid">
+          </div>
+        </div>
+        <div class="field">
+          <label for="country">Search country</label>
+          <select id="country">
+            <option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option>
+            <option value="IN">India</option><option value="DE">Germany</option><option value="FR">France</option>
+            <option value="IE">Ireland</option><option value="NL">Netherlands</option><option value="SG">Singapore</option>
+            <option value="AU">Australia</option><option value="JP">Japan</option>
+          </select>
+          <div class="field" style="margin-top:12px">
+            <label for="days">Posted within</label>
+            <select id="days">
+              <option value="7">7 days</option><option value="14">14 days</option><option value="30" selected>30 days</option>
+              <option value="60">60 days</option><option value="0">any time</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="agents">Careers sites to browse with Agent</label>
+          <select id="agents">
+            <option value="0">0 (free: Search and Fetch only)</option><option value="1">1</option>
+            <option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option>
+          </select>
+          <div class="hint">Agent runs use TinyFish credits. Results are cached for 12 hours.</div>
+          <div style="margin-top:10px" class="check"><input type="checkbox" id="discover" checked><label for="discover">Discover new companies with Search</label></div>
+          <div style="margin-top:6px" class="check"><input type="checkbox" id="hideNo" checked><label for="hideNo">Hide jobs that say no sponsorship</label></div>
+          <div style="margin-top:6px" class="check"><input type="checkbox" id="force"><label for="force">Skip caches and read everything live</label></div>
+        </div>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button class="primary" id="go" type="submit">Find jobs</button>
+      <button id="save" type="button">Save this search</button>
+    </div>
+    <p class="err" id="formErr" role="alert" hidden></p>
+  </form>
+
+  <section class="saved" id="savedBox" hidden>
+    <h2>Saved searches</h2>
+    <ul id="savedList"></ul>
+  </section>
+
+  <section class="progress" id="progress" hidden aria-live="polite">
+    <h2 id="progressTitle">Searching</h2>
+    <ol id="log"></ol>
+  </section>
+
+  <section id="results" hidden>
+    <p class="summary" id="summary"></p>
+    <p class="usage" id="usage"></p>
+    <div class="toolbar" role="group" aria-label="Filter results">
+      <label class="sr" for="q">Filter by text</label>
+      <input type="search" id="q" placeholder="Filter by title, company or city">
+      <label class="sr" for="sort">Sort</label>
+      <select id="sort"><option value="score">Best match</option><option value="date">Newest</option></select>
+      <span class="check"><input type="checkbox" id="fNew"><label for="fNew">New only</label></span>
+      <span class="check"><input type="checkbox" id="fRemote"><label for="fRemote">Remote only</label></span>
+      <span class="check"><input type="checkbox" id="fVisa"><label for="fVisa">Mentions sponsorship</label></span>
+      <button class="link" id="csv" type="button">Export CSV</button>
+      <span class="count" id="count"></span>
+    </div>
+    <ol class="jobs" id="jobs"></ol>
+    <div class="empty" id="empty" hidden></div>
+
+    <div class="section">
+      <h2>Where these came from</h2>
+      <div class="tablewrap"><table id="sources"></table></div>
+      <p class="filtered" id="filteredNote" hidden></p>
+      <ul class="warnings" id="warnings"></ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = { taskId: null, result: null, logSeen: 0, timer: null };
+
+  function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else n.setAttribute(k, v);
+    }
+    for (const k of kids) if (k !== null && k !== undefined) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+    return n;
+  }
+  const safeHref = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
+  const IRREGULAR = { match: 'matches', company: 'companies', query: 'queries' };
+  const plural = (n, w) => `${n.toLocaleString()} ${n === 1 ? w : (IRREGULAR[w] || `${w}s`)}`;
+  function ago(iso) {
+    if (!iso) return null;
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    return d <= 0 ? 'posted today' : d === 1 ? 'posted yesterday' : `posted ${d} days ago`;
+  }
+
+  function readPrefs() {
+    return {
+      role: $('role').value.trim(),
+      seniority: $('seniority').value,
+      locations: $('locations').value,
+      visa: $('visa').value,
+      hideNoSponsor: $('hideNo').checked,
+      companies: $('companies').value,
+      keywords: $('keywords').value,
+      exclude: $('exclude').value,
+      country: $('country').value,
+      postedWithinDays: Number($('days').value),
+      maxAgentRuns: Number($('agents').value),
+      discover: $('discover').checked,
+    };
+  }
+  function writePrefs(p) {
+    const join = (v, sep) => Array.isArray(v) ? v.join(sep) : (v || '');
+    $('role').value = p.role || '';
+    $('seniority').value = p.seniority || 'any';
+    $('locations').value = join(p.locations, '; ');
+    $('visa').value = p.visa || 'any';
+    $('hideNo').checked = p.hideNoSponsor !== false;
+    $('companies').value = join(p.companies, '\n');
+    $('keywords').value = join(p.keywords, ', ');
+    $('exclude').value = join(p.exclude, ', ');
+    $('country').value = p.country || 'US';
+    $('days').value = String(p.postedWithinDays ?? 30);
+    $('agents').value = String(p.maxAgentRuns ?? 2);
+    $('discover').checked = p.discover !== false;
+    sizeInputs();
+    sizeSelects();
+  }
+  function sizeInputs() {
+    for (const id of ['role', 'locations']) {
+      const i = $(id);
+      const len = i.value.length || i.placeholder.length;
+      i.style.width = `${Math.max(len, 5) * 0.95 + 1}ch`;
+    }
+  }
+  function sizeSelects() {
+    for (const id of ['seniority', 'visa']) {
+      const sel = $(id);
+      const text = sel.options[sel.selectedIndex].text;
+      sel.style.width = `${Math.max(text.length, 3) * 0.86 + 1.2}ch`;
+    }
+  }
+  ['role', 'locations'].forEach((id) => $(id).addEventListener('input', sizeInputs));
+  ['seniority', 'visa'].forEach((id) => $(id).addEventListener('change', sizeSelects));
+
+  function showError(msg) { const e = $('formErr'); e.textContent = msg; e.hidden = !msg; }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+    return body;
+  }
+
+  async function start(path, body) {
+    showError('');
+    $('go').disabled = true;
+    $('go').textContent = 'Searching';
+    $('progress').hidden = false;
+    $('progressTitle').textContent = 'Searching';
+    $('log').replaceChildren();
+    state.logSeen = 0;
+    try {
+      const { taskId } = await api(path, { method: 'POST', body: JSON.stringify(body) });
+      state.taskId = taskId;
+      poll();
+    } catch (err) {
+      showError(err.message);
+      done();
+    }
+  }
+  function done() {
+    $('go').disabled = false;
+    $('go').textContent = 'Find jobs';
+    clearTimeout(state.timer);
+  }
+  async function poll() {
+    try {
+      const t = await api(`/api/task/${state.taskId}?since=${state.logSeen}`);
+      for (const line of t.log) {
+        const li = el('li', { class: line.kind }, el('span', { class: 'kind', text: line.kind === 'step' ? '' : line.kind }), line.msg);
+        $('log').append(li);
+      }
+      state.logSeen += t.log.length;
+      $('log').scrollTop = $('log').scrollHeight;
+      if (t.status === 'running') { state.timer = setTimeout(poll, 1200); return; }
+      done();
+      if (t.status === 'error') { $('progressTitle').textContent = 'Search stopped'; showError(t.error); return; }
+      $('progressTitle').textContent = `Finished in ${Math.round(t.result.durationMs / 1000)}s`;
+      render(t.result, true);
+      loadSaved();
+    } catch (err) {
+      done();
+      showError(err.message);
+    }
+  }
+
+  function summaryText(r) {
+    const c = r.counts;
+    const companies = new Set(r.listings.map((l) => l.company)).size;
+    let s = `${plural(c.matched, 'match')} from ${plural(c.unique, 'open job')} across ${plural(r.boards.length + r.agentSites.length, 'careers page')}`;
+    if (c.matched) s += `, at ${plural(companies, 'company')}`;
+    s += '.';
+    if (!r.firstRun) s += ` ${c.newSinceLastRun} new since your last run.`;
+    else s += ' First run of this search, so next time new jobs will be marked.';
+    return s;
+  }
+  function usageText(u) {
+    const parts = [
+      `Search: ${plural(u.search.calls, 'query')}`,
+      `Fetch: ${plural(u.fetch.calls, 'call')} reading ${plural(u.fetch.urls, 'URL')}`,
+      `Agent: ${plural(u.agent.runs, 'run')}${u.agent.cached ? `, ${u.agent.cached} from cache` : ''}`,
+    ];
+    return `TinyFish usage. ${parts.join('. ')}.`;
+  }
+
+  function render(r, fresh) {
+    state.result = r;
+    $('results').hidden = false;
+    $('summary').textContent = summaryText(r);
+    $('usage').textContent = usageText(r.usage);
+    renderJobs(fresh);
+    renderSources(r);
+  }
+
+  function filtered() {
+    const r = state.result;
+    const q = $('q').value.trim().toLowerCase();
+    let list = r.listings.filter((l) =>
+      (!q || `${l.title} ${l.company} ${l.location || ''}`.toLowerCase().includes(q)) &&
+      (!$('fNew').checked || l.isNew) &&
+      (!$('fRemote').checked || l.remote) &&
+      (!$('fVisa').checked || l.visa.status === 'yes' || l.visa.status === 'opt'));
+    if ($('sort').value === 'date') list = [...list].sort((a, b) => String(b.postedAt || '').localeCompare(String(a.postedAt || '')));
+    return list;
+  }
+
+  function jobRow(l, fresh) {
+    const href = safeHref(l.applyUrl) || safeHref(l.url);
+    const band = l.score >= 75 ? 'hi' : l.score >= 50 ? 'mid' : 'lo';
+    const meter = el('span', { class: 'meter', 'aria-hidden': 'true' }, el('span', { style: `height:${l.score}%` }));
+    const score = el('div', { class: `score ${band}`, title: 'Match score out of 100' }, meter, el('span', { text: l.score }), el('span', { class: 'sr', text: ' out of 100' }));
+
+    const title = el('h3', { class: 'jt' }, href ? el('a', { href, target: '_blank', rel: 'noopener', text: l.title }) : l.title);
+    const meta = el('div', { class: 'jm' }, el('strong', { text: l.company }), `, ${l.location || 'location not listed'}`);
+    const chips = el('div', { class: 'chips' });
+    if (l.isNew) chips.append(el('span', { class: 'chip new', text: 'New' }));
+    if (l.level && l.level !== 'unspecified') chips.append(el('span', { class: 'chip', text: l.levelLabel }));
+    if (l.remote) chips.append(el('span', { class: 'chip', text: 'Remote' }));
+    const visaText = { yes: 'Sponsorship mentioned', opt: 'Mentions OPT/CPT', no: 'No sponsorship' }[l.visa.status];
+    if (visaText) chips.append(el('span', { class: `chip visa-${l.visa.status}`, text: visaText }));
+    const posted = ago(l.postedAt);
+    if (posted) chips.append(el('span', { class: 'chip', text: posted }));
+    if (l.salary) chips.append(el('span', { class: 'chip', text: l.salary }));
+
+    const why = l.reasons.length ? el('div', { class: 'why', text: `Why: ${l.reasons.join('; ')}.` }) : null;
+    let ev = null;
+    if (l.visa.evidence || l.otherLocations.length || l.sources.length) {
+      ev = el('details', {}, el('summary', { text: 'Details' }));
+      if (l.visa.evidence) ev.append(el('p', { text: `Visa text from the posting: "${l.visa.evidence}"` }));
+      if (l.otherLocations.length) ev.append(el('p', { text: `Also listed in: ${l.otherLocations.join('; ')}` }));
+      ev.append(el('p', { text: `Found via ${l.sources.join(', ')}${l.ats ? ` on ${l.ats}` : ''}.` }));
+    }
+    const apply = el('div', { class: 'apply' }, href ? el('a', { href, target: '_blank', rel: 'noopener', text: 'Apply' }) : null);
+    return el('li', { class: `job${fresh && l.isNew ? ' fresh' : ''}` }, score, el('div', {}, title, meta, chips, why, ev), apply);
+  }
+
+  function renderJobs(fresh) {
+    const list = filtered();
+    const r = state.result;
+    $('count').textContent = `Showing ${list.length} of ${r.listings.length}`;
+    $('jobs').replaceChildren(...list.map((l) => jobRow(l, fresh)));
+    const empty = $('empty');
+    if (list.length) { empty.hidden = true; return; }
+    empty.hidden = false;
+    empty.replaceChildren();
+    if (r.listings.length) {
+      empty.append(el('p', { text: 'No jobs match these filters. Clear the filters above to see all matches.' }));
+      return;
+    }
+    const top = Object.entries(r.filteredOut).sort((a, b) => b[1] - a[1]);
+    empty.append(el('p', { text: r.counts.unique
+      ? `No matches yet. ${plural(r.counts.unique, 'job')} were read and filtered out.`
+      : 'No jobs were read. Check the notes below, add companies to always check, or try a broader role.' }));
+    if (top.length) {
+      const hints = { role: 'try a broader role name', level: 'set the level to any', location: 'add Remote or another city', visa: 'untick "Hide jobs that say no sponsorship" to see them', fresh: 'allow older postings', keywords: 'remove a hidden word' };
+      empty.append(el('p', { text: `Filtered out by: ${top.map(([k, v]) => `${k} (${v})`).join(', ')}. To widen the search, ${hints[top[0][0]] || 'loosen your filters'}.` }));
+    }
+  }
+
+  function renderSources(r) {
+    const t = $('sources');
+    t.replaceChildren(el('thead', {}, el('tr', {}, el('th', { text: 'Company' }), el('th', { text: 'How it was read' }), el('th', { text: 'Open jobs read' }), el('th', { text: 'Page' }))));
+    const body = el('tbody');
+    for (const b of r.boards) {
+      const href = safeHref(b.url);
+      body.append(el('tr', {}, el('td', { text: b.company }), el('td', { text: `Fetch, ${b.ats} ${b.via}${b.note ? ` (${b.note})` : ''}` }), el('td', { text: b.jobs }), el('td', {}, href ? el('a', { href, target: '_blank', rel: 'noopener', text: new URL(href).hostname }) : '')));
+    }
+    for (const a of r.agentSites) {
+      const href = safeHref(a.url);
+      body.append(el('tr', {}, el('td', { text: a.company }), el('td', { text: `Agent, ${a.ats} (${a.status}${a.steps ? `, ${a.steps} steps` : ''})` }), el('td', { text: a.jobs }), el('td', {}, href ? el('a', { href, target: '_blank', rel: 'noopener', text: new URL(href).hostname }) : '')));
+    }
+    if (!r.boards.length && !r.agentSites.length) body.append(el('tr', {}, el('td', { colspan: '4', text: 'No careers pages were read.' })));
+    t.append(body);
+    const drops = Object.entries(r.filteredOut).sort((a, b) => b[1] - a[1]);
+    const note = $('filteredNote');
+    note.hidden = !drops.length;
+    note.textContent = drops.length ? `Not shown because of: ${drops.map(([k, v]) => `${k} (${v})`).join(', ')}.` : '';
+    $('warnings').replaceChildren(...r.warnings.map((w) => el('li', { text: w })));
+  }
+
+  ['q', 'sort', 'fNew', 'fRemote', 'fVisa'].forEach((id) => $(id).addEventListener('input', () => state.result && renderJobs(false)));
+
+  $('csv').addEventListener('click', () => {
+    if (!state.result) return;
+    const cell = (v) => {
+      let s = v === null || v === undefined ? '' : String(v);
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const head = ['score', 'title', 'company', 'location', 'level', 'remote', 'visa', 'posted', 'new', 'apply_url', 'why'];
+    const rows = filtered().map((l) => [l.score, l.title, l.company, l.location, l.levelLabel, l.remote ? 'yes' : '', l.visa.status,
+      l.postedAt ? l.postedAt.slice(0, 10) : '', l.isNew ? 'yes' : '', l.applyUrl, l.reasons.join('; ')]);
+    const blob = new Blob([[head, ...rows].map((r) => r.map(cell).join(',')).join('\n')], { type: 'text/csv' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: `jobs-${new Date().toISOString().slice(0, 10)}.csv` });
+    document.body.append(a); a.click(); a.remove();
+  });
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const prefs = readPrefs();
+    if (!prefs.role) { showError('Add a role, for example "software engineer".'); $('role').focus(); return; }
+    try { localStorage.setItem('jf-last', JSON.stringify(prefs)); } catch {}
+    start('/api/search', { prefs, force: $('force').checked });
+  });
+
+  $('save').addEventListener('click', async () => {
+    const prefs = readPrefs();
+    if (!prefs.role) { showError('Add a role before saving.'); return; }
+    const name = prompt('Name this search', `${prefs.role}${prefs.locations ? `, ${prefs.locations}` : ''}`);
+    if (name === null) return;
+    try { await api('/api/searches', { method: 'POST', body: JSON.stringify({ name, prefs }) }); loadSaved(); }
+    catch (err) { showError(err.message); }
+  });
+
+  async function loadSaved() {
+    let list = [];
+    try { list = await api('/api/searches'); } catch { return; }
+    $('savedBox').hidden = !list.length;
+    $('savedList').replaceChildren(...list.map((s) => {
+      const meta = s.lastRunAt
+        ? `Last run ${new Date(s.lastRunAt).toLocaleString()}${s.lastSummary ? `, ${s.lastSummary.matched} matches, ${s.lastSummary.fresh} new` : ''}`
+        : 'Not run yet';
+      const run = el('button', { class: 'link', type: 'button', text: 'Run now' });
+      run.onclick = () => { writePrefs(s.prefs); state.taskId = null; start(`/api/searches/${s.id}/run`, { force: $('force').checked }); };
+      const show = el('button', { class: 'link', type: 'button', text: 'Show last results' });
+      show.onclick = async () => {
+        try { const r = await api(`/api/searches/${s.id}/latest`); writePrefs(s.prefs); state.taskId = null; render(r, false); }
+        catch (err) { showError(err.message); }
+      };
+      const del = el('button', { class: 'link', type: 'button', text: 'Delete' });
+      del.onclick = async () => { await api(`/api/searches/${s.id}`, { method: 'DELETE' }); loadSaved(); };
+      return el('li', {}, el('div', { class: 'name', text: s.name }), el('div', { class: 'meta', text: meta }), el('div', {}, run, s.lastRunAt ? show : null, del));
+    }));
+  }
+
+  (async () => {
+    try {
+      const s = await api('/api/status');
+      const k = $('keystate');
+      k.textContent = s.hasKey ? `Connected to TinyFish${s.refreshHours ? `, saved searches refresh every ${s.refreshHours}h` : ''}` : 'TINYFISH_API_KEY is not set on the server';
+      k.classList.toggle('bad', !s.hasKey);
+    } catch { $('keystate').textContent = 'Server not reachable'; }
+    try { const last = JSON.parse(localStorage.getItem('jf-last') || 'null'); if (last) writePrefs(last); } catch {}
+    sizeInputs();
+    sizeSelects();
+    loadSaved();
+  })();
+})();
+</script>
+</body>
+</html>
