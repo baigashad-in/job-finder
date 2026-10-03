@@ -23,7 +23,7 @@ function validateSchema(node, path = '#') {
 }
 
 function state() {
-  return { extraAcmeJob: false, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
+  return { extraAcmeJob: false, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
 }
 
 function greenhouseFeed(st) {
@@ -179,7 +179,7 @@ function startMock(port = 0) {
         if (!run) return send(404, { error: 'not found' });
         if (m[2]) { st.calls.cancel++; return send(200, { run_id: m[1], status: 'CANCELLED' }); }
         st.calls.agentPoll++;
-        if (Date.now() - run.created < 150) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });
+        if (Date.now() - run.created < st.runDelayMs) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });
         return send(200, { run_id: m[1], status: 'COMPLETED', num_of_steps: 7, result: agentResult(run, st), error: null });
       }
       return send(404, { error: 'unknown route' });

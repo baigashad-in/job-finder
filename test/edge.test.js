@@ -6,6 +6,9 @@ const { startMock } = require('./mock-tinyfish');
 test('slow Agent runs are cancelled so they stop using credits', async (t) => {
   const mock = await startMock();
   t.after(() => mock.server.close());
+  // The run stays RUNNING for a minute, far past the 100ms deadline, so the result
+  // does not depend on timer precision (Windows timers are coarser than Linux).
+  mock.st.runDelayMs = 60000;
   process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
   const { TinyFish } = require('../src/tinyfish');
   const tf = new TinyFish({ apiKey: 'test-key' });
