@@ -13,7 +13,7 @@ const { readFeeds, readWorkdayBoards, enrich } = require('./read');
 const { runAgents } = require('./agent');
 const { plural } = require('./util');
 
-const MAX_BOARDS = Number(process.env.MAX_BOARDS || 25);
+const MAX_BOARDS = Number(process.env.MAX_BOARDS || 40);
 const ENRICH_LIMIT = Number(process.env.ENRICH_LIMIT || 20);
 const MAX_RESULTS = 300;
 
@@ -69,7 +69,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
 
   // Postings found directly by Search on sites without feeds
   const singles = [...disc.singles.values()].map((s) => ({
-    title: s.title, company: s.company, location: null, locations: [], remote: null, workplace: null,
+    title: s.title, company: s.company, location: s.location || null, locations: s.location ? [s.location] : [], remote: null, workplace: null,
     postedAt: s.postedAt, url: s.url, applyUrl: s.url, department: null, employmentType: null, salary: null,
     description: '', levelHint: null, ats: s.ats, sources: ['search'],
   }));

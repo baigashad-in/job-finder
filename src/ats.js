@@ -162,6 +162,18 @@ function parseJsonText(t) {
   return null;
 }
 
+// Fetch result requested as HTML. A JSON document usually arrives as raw JSON or inside
+// <pre> with HTML entities escaped, so try both. Entities are decoded in one pass, so
+// text like &amp;quot; inside JSON strings stays intact.
+function parseJsonFromHtml(t) {
+  if (t == null) return null;
+  const direct = parseJsonText(t);
+  if (direct) return direct;
+  const s = String(t);
+  const pre = s.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+  return parseJsonText(decodeEntities(pre ? pre[1] : s.replace(/<[^>]+>/g, '')));
+}
+
 function clip(s, n = 8000) {
   s = String(s || '');
   return s.length > n ? s.slice(0, n) : s;
@@ -185,7 +197,7 @@ function parseGreenhouse(json, board) {
     const offices = (j.offices || []).map((o) => o.location || o.name).filter(Boolean);
     return {
       title: j.title,
-      company: j.company_name || board.company || prettyName(board.token),
+      company: String(j.company_name || board.company || prettyName(board.token)).trim(),
       location: loc,
       locations: [loc, ...offices].filter(Boolean),
       remote: null,
@@ -349,7 +361,13 @@ function workdayJobsFromMarkdown(markdown, target) {
 // Fallback when the page text has no usable link markup: build jobs from the links list
 // Fetch returns with links: true. The title comes from the URL slug:
 // /job/Bangalore-India/Software-Engineer--Java-_R123 -> "Software Engineer Java".
-function workdayJobsFromLinks(urls, target) {
+// The URL slug loses punctuation ("C++" becomes "C"), so when the page text has a line
+// with the same words, use that line as the title and read the posted date below it.
+function workdayJobsFromLinks(urls, target, text = '') {
+  const lines = String(text).split('\n').map((l) => l.replace(/[*_#`>|\[\]]/g, '').trim()).filter(Boolean);
+  const keyOf = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const lineKeys = lines.map(keyOf);
+  const used = new Set();
   const md = (urls || []).map((u) => {
     try {
       const x = new URL(u, target.boardUrl || target.url);
@@ -357,15 +375,36 @@ function workdayJobsFromLinks(urls, target) {
       const j = parts.indexOf('job');
       if (j < 0 || parts.length < j + 3) return '';
       const slug = decodeURIComponent(parts[parts.length - 1]).replace(/_[A-Za-z0-9-]+$/, '');
-      const title = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
-      return title.length >= 3 ? `[${title}](${x.href})` : '';
+      let title = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      let below = '';
+      const k = keyOf(title);
+      const i = k.length >= 6 ? lineKeys.findIndex((lk, n) => !used.has(n) && (lk === k || (k.length >= 15 && lk.startsWith(k)))) : -1;
+      if (i >= 0) {
+        used.add(i);
+        title = lines[i];
+        below = lines.slice(i + 1, i + 4).join('\n');
+      }
+      return title.length >= 3 ? `[${title}](${x.href})\n${below}` : '';
     } catch { return ''; }
   }).filter(Boolean).join('\n');
   return workdayJobsFromMarkdown(md, target);
 }
 
+// /en-US/Site/job/Bangalore-India/SWE_R1 -> "Bangalore India"
+function workdayLocationFromUrl(u) {
+  const x = safeUrl(u);
+  if (!x || !x.hostname.endsWith('.myworkdayjobs.com')) return null;
+  const parts = x.pathname.split('/').filter(Boolean);
+  const j = parts.indexOf('job');
+  if (j < 0 || parts.length < j + 3) return null;
+  let loc;
+  try { loc = decodeURIComponent(parts[j + 1]); } catch { loc = parts[j + 1]; }
+  return loc.replace(/[-_]+/g, ' ').trim() || null;
+}
+
 module.exports = {
   FEED_DOMAINS, AGENT_DOMAINS, ATS_DOMAINS, PARSERS,
   detectAts, htmlToText, decodeEntities, prettyName, companyFromTitle, parseJsonText,
-  jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, toIso, clip, safeUrl,
+  jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, workdayLocationFromUrl,
+  parseJsonFromHtml, toIso, clip, safeUrl,
 };

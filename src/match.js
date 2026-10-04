@@ -342,9 +342,16 @@ function evaluate(listing, p, now = Date.now()) {
 function canonicalUrl(u) {
   const x = safeUrl(u);
   if (!x) return null;
+  const host = x.hostname.replace(/^www\./, '').toLowerCase();
   const gh = x.searchParams.get('gh_jid');
   let path = x.pathname.replace(/\/+$/, '').replace(/\/(apply|application)$/i, '');
-  return `${x.hostname.replace(/^www\./, '').toLowerCase()}${path.toLowerCase()}${gh ? `?gh_jid=${gh}` : ''}`;
+  // Workday shows one job under several URLs (with or without /en-US/, different slugs).
+  // The ID after the last "_" (R12345, JR-001) is what identifies it.
+  if (host.endsWith('.myworkdayjobs.com') && /\/job\//.test(path)) {
+    const last = path.split('/').pop();
+    return `${host}/job/${(last.includes('_') ? last.split('_').pop() : last).toLowerCase()}`;
+  }
+  return `${host}${path.toLowerCase()}${gh ? `?gh_jid=${gh}` : ''}`;
 }
 function contentKey(l) {
   return [norm(l.company), norm(l.title), norm((l.location || '').split(/[;,|]/)[0])].join('|');

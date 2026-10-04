@@ -23,7 +23,7 @@ function validateSchema(node, path = '#') {
 }
 
 function state() {
-  return { extraAcmeJob: false, workdayPage: false, pendingMs: 0, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
+  return { extraAcmeJob: false, workdayPage: false, workdayLinksOnly: false, pendingMs: 0, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
 }
 
 function greenhouseFeed(st) {
@@ -44,7 +44,9 @@ function greenhouseFeed(st) {
   return JSON.stringify({ jobs, meta: { total: jobs.length } }).replace(/_/g, '\\_');
 }
 
-const leverFeed = () => '```json\n' + JSON.stringify([
+// Lever feeds hold raw HTML inside JSON strings. As markdown that HTML gets converted
+// and the JSON breaks (what the first live runs suggested); as HTML it arrives escaped in <pre>.
+const leverJson = () => JSON.stringify([
   { id: 'aaa-1', text: 'Software Engineer Intern', categories: { location: 'New York, NY', commitment: 'Internship', team: 'Platform' }, createdAt: Date.now() - 5 * DAY,
     hostedUrl: 'https://jobs.lever.co/globex/aaa-1', applyUrl: 'https://jobs.lever.co/globex/aaa-1/apply', workplaceType: 'onsite',
     descriptionPlain: 'Work on our platform. We are unable to sponsor visas for this role.', lists: [], additionalPlain: '' },
@@ -53,7 +55,11 @@ const leverFeed = () => '```json\n' + JSON.stringify([
     descriptionPlain: 'Python and Go services.', lists: [{ text: 'Benefits', content: '<li>Visa sponsorship is available.</li>' }], additionalPlain: '',
     salaryRange: { currency: 'USD', interval: 'per-hour-wage', min: 45, max: 55 } },
   { id: 'aaa-3', text: 'Product Design Intern', categories: { location: 'New York, NY' }, createdAt: Date.now() - 2 * DAY, hostedUrl: 'https://jobs.lever.co/globex/aaa-3', descriptionPlain: 'Figma.' },
-]) + '\n```';
+]);
+const escHtml = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const leverFeed = (format) => (format === 'html'
+  ? `<html><body><pre>${escHtml(leverJson())}</pre></body></html>`
+  : leverJson().replace(/<li>/g, '\n* ').replace(/<\/li>/g, ''));
 
 const ashbyInitech = () => JSON.stringify({ apiVersion: '1', jobs: [
   { id: 'i1', title: 'Software Engineer, New Grad', location: 'New York', publishedAt: ago(2), isListed: true, isRemote: false, jobUrl: 'https://jobs.ashbyhq.com/initech/i1', applyUrl: 'https://jobs.ashbyhq.com/initech/i1/application', descriptionPlain: 'TPS reports.' },
@@ -84,13 +90,21 @@ const PAGES = {
   'https://careers.vandelay.com/jobs/43': '# Import/Export Software Intern\nNew York. We are unable to sponsor employment visas.',
 };
 
-function fetchOne(url, st) {
+function fetchOne(url, st, format) {
   if (url.startsWith('https://boards-api.greenhouse.io/v1/boards/acme/jobs')) return { text: greenhouseFeed(st) };
-  if (url.startsWith('https://api.lever.co/v0/postings/globex')) return { text: leverFeed() };
+  if (url.startsWith('https://api.lever.co/v0/postings/globex')) return { text: leverFeed(format) };
   if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/initech')) return { text: ashbyInitech() };
   if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/piedpiper')) return { text: ashbyPiedPiper() };
   if (url.startsWith('https://api.smartrecruiters.com/v1/companies/Hooli/postings')) return { text: smartHooli() };
   if (PAGES[url]) return { text: PAGES[url], title: PAGES[url].split('\n')[0].replace('# ', '') };
+  if (st.workdayLinksOnly && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
+    // Page text without link markup; job links only in the separate links list.
+    return { text: 'Umbrella Careers\n2 JOBS FOUND\nSoftware Engineer Intern (C++)\nNew York, NY\nPosted 3 Days Ago', links: [
+      'https://umbrella.wd5.myworkdayjobs.com/External/job/New-York/Software-Engineer-Intern--C--_R123',
+      'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/Austin/Software-Engineer-Intern-Infra_R124',
+      'https://www.workday.com/privacy',
+    ] };
+  }
   if (st.workdayPage && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
     return { text: [
       '# Umbrella Careers', '2 JOBS FOUND',
@@ -162,9 +176,9 @@ function startMock(port = 0) {
         const results = [];
         const errors = [];
         for (const u of body.urls) {
-          const r = fetchOne(u, st);
+          const r = fetchOne(u, st, body.format);
           if (r.error) errors.push({ url: u, error: r.error, status: r.status });
-          else results.push({ url: u, final_url: u, title: r.title || null, description: null, language: 'en', author: null, published_date: null, text: r.text, format: body.format || 'markdown', latency_ms: 5 });
+          else results.push({ url: u, final_url: u, title: r.title || null, description: null, language: 'en', author: null, published_date: null, text: r.text, format: body.format || 'markdown', latency_ms: 5, ...(body.links ? { links: r.links || [] } : {}) });
         }
         return send(200, { results, errors });
       }
@@ -187,6 +201,7 @@ function startMock(port = 0) {
         if (!run) return send(404, { error: 'not found' });
         if (m[2]) { st.calls.cancel++; return send(200, { run_id: m[1], status: 'CANCELLED' }); }
         st.calls.agentPoll++;
+        if (run.url.includes('failco')) return send(200, { run_id: m[1], status: 'FAILED', result: null, error: { message: 'mock failure' } });
         const age = Date.now() - run.created;
         if (age < st.pendingMs) return send(200, { run_id: m[1], status: 'PENDING', result: null, streaming_url: null });
         if (age - st.pendingMs < st.runDelayMs) return send(200, { run_id: m[1], status: 'RUNNING', result: null, streaming_url: `https://live.example.test/${m[1]}` });

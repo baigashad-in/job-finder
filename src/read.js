@@ -6,7 +6,7 @@
 //             postings found by Search), Fetch the posting page itself. The text is
 //             what visa detection, keyword matching and "job closed" checks read.
 
-const { PARSERS, parseJsonText, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, clip, toIso } = require('./ats');
+const { PARSERS, parseJsonText, parseJsonFromHtml, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, prettyName, clip, toIso } = require('./ats');
 const { pool, plural } = require('./util');
 
 function byRequestedUrl(res) {
@@ -31,30 +31,33 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
   if (!boards.length) return { listings: [], boardReport: [] };
   const ttl = force ? 0 : 3600; // accept a TinyFish cache entry up to 1 hour old unless refreshing
   const purpose = `Read the public job feed of each company to list open ${p.role} roles`;
-  const res = byRequestedUrl(await fetchChunks(tf, boards.map((b) => b.feedUrl), { ttl, purpose, perUrlTimeoutMs: 60000 }));
+  // SmartRecruiters returns at most 100 postings, so ask it for the role up front.
+  const feedUrlOf = (b) => (b.ats === 'smartrecruiters' ? `${b.feedUrl}&q=${encodeURIComponent(p.role)}` : b.feedUrl);
+  const res = byRequestedUrl(await fetchChunks(tf, boards.map(feedUrlOf), { ttl, purpose, perUrlTimeoutMs: 60000 }));
 
   const listings = [];
   const report = [];
   const retryLite = [];
   const retryPage = [];
+  const retryHtml = [];
 
   for (const b of boards) {
-    const r = res.ok.get(b.feedUrl);
+    const r = res.ok.get(feedUrlOf(b));
     if (r) {
       const json = parseJsonText(r.text);
       if (json) {
         const items = PARSERS[b.ats](json, b);
         items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
         listings.push(...items);
-        report.push({ company: items[0] ? items[0].company : b.company || b.token, ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'feed' });
+        report.push({ company: items[0] ? items[0].company : b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'feed' });
         continue;
       }
-      retryPage.push(b);
+      retryHtml.push(b);
       continue;
     }
-    const e = res.err.get(b.feedUrl);
+    const e = res.err.get(feedUrlOf(b));
     if (e && e.error === 'content_too_large' && b.feedUrlLite) retryLite.push(b);
-    else if (e && e.error === 'page_not_found') report.push({ company: b.company || b.token, ats: b.ats, url: b.boardUrl, jobs: 0, via: 'feed', note: 'board not found' });
+    else if (e && e.error === 'page_not_found') report.push({ company: b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: 0, via: 'feed', note: 'board not found' });
     else retryPage.push(b);
   }
 
@@ -72,6 +75,23 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
     }
   }
 
+  // Feed text was not valid JSON. Lever and Ashby feeds hold raw HTML inside JSON strings,
+  // which can break when Fetch converts the page to markdown. Ask for HTML and take the
+  // JSON from that. Only feeds that still fail fall through to the board page below.
+  if (retryHtml.length) {
+    log('fetch', `${plural(retryHtml.length, 'feed')} did not parse as JSON, retrying as HTML`);
+    const html = byRequestedUrl(await fetchChunks(tf, retryHtml.map(feedUrlOf), { ttl, purpose, format: 'html', perUrlTimeoutMs: 60000 }));
+    for (const b of retryHtml) {
+      const r = html.ok.get(feedUrlOf(b));
+      const json = r ? parseJsonFromHtml(r.text) : null;
+      if (!json) { retryPage.push(b); continue; }
+      const items = PARSERS[b.ats](json, b);
+      items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
+      listings.push(...items);
+      report.push({ company: items[0] ? items[0].company : b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'feed (html)' });
+    }
+  }
+
   // Feed unreadable: read the human board page and pull job links out of it.
   if (retryPage.length) {
     log('fetch', `${plural(retryPage.length, 'feed')} unreadable, reading board pages instead`);
@@ -82,7 +102,7 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
       items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
       listings.push(...items);
       const e = pages.err.get(b.boardUrl);
-      report.push({ company: b.company || b.token, ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'board page', note: e ? e.error : undefined });
+      report.push({ company: b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'board page', note: e ? e.error : undefined });
       if (e) warnings.push(`Could not read ${b.boardUrl}: ${e.error}`);
     }
   }
@@ -155,7 +175,7 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
       const links = Array.isArray(page.links) ? page.links : [];
       if (/\b0\s+jobs?\s+found\b/i.test(text)) zero = true;
       let found = workdayJobsFromMarkdown(text, t);
-      if (!found.length && links.length) found = workdayJobsFromLinks(links, t);
+      if (!found.length && links.length) found = workdayJobsFromLinks(links, t, text);
       for (const item of found) byUrl.set(item.url, item);
       const jobLinks = links.filter((u) => /\/job\//.test(u)).length;
       seen.push(`${text.length} chars, ${links.length} links (${jobLinks} to jobs), ${found.length} jobs read`);

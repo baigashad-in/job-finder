@@ -4,7 +4,7 @@
 // or job board. A single posting hit tells us the company's board token, and we
 // then read the whole board (Step 2), not just the one posting the search found.
 
-const { ATS_DOMAINS, PARSERS, detectAts, companyFromTitle, prettyName, safeUrl, toIso, parseJsonText } = require('./ats');
+const { ATS_DOMAINS, PARSERS, detectAts, companyFromTitle, prettyName, safeUrl, toIso, parseJsonText, workdayLocationFromUrl } = require('./ats');
 const { pool, plural } = require('./util');
 
 const LEVEL_WORDS = { intern: 'intern', entry: 'new grad', senior: 'senior', staff: 'staff', manager: 'manager' };
@@ -66,7 +66,7 @@ function addHit(acc, r, from) {
   if (d.jobId && !acc.singles.has(r.url)) {
     acc.singles.set(r.url, {
       url: r.url, title: cleanSearchTitle(r.title), snippet: r.snippet || '',
-      company: t.company, ats: d.ats, postedAt: toIso(r.date),
+      company: t.company, ats: d.ats, postedAt: toIso(r.date), location: workdayLocationFromUrl(r.url),
     });
   }
   return isNew;

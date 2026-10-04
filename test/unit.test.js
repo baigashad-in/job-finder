@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { detectAts, parseJsonText, htmlToText, companyFromTitle, workdayJobsFromMarkdown, prettyName } = require('../src/ats');
 const { parseAgentResult } = require('../src/agent');
-const { cleanSearchTitle } = require('../src/discover');
+const { cleanSearchTitle, buildQueries } = require('../src/discover');
+const { workdayJobsFromLinks, workdayLocationFromUrl, parseJsonFromHtml } = require('../src/ats');
 const { detectLevel, detectVisa, scoreLocation, normalizePrefs, dedupe, canonicalUrl, evaluate } = require('../src/match');
 const { parsePostedText } = require('../src/util');
 const { OUTPUT_SCHEMA } = require('../src/agent');
@@ -148,6 +149,58 @@ test('parses posted date text', () => {
 
 test('Agent output schema only uses keywords TinyFish accepts', () => {
   assert.doesNotThrow(() => validateSchema(OUTPUT_SCHEMA));
+});
+
+test('search country follows the typed city', () => {
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Bangalore', country: 'US' }).country, 'IN');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Bangalore', country: 'US' }).countryFrom, 'Bangalore');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'London; Remote' }).country, 'GB');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'New York', country: 'US' }).countryFrom, null);
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Kochi', country: 'IN' }).country, 'IN', 'unknown city keeps the dropdown');
+});
+
+test('Search asks each job system separately', () => {
+  const qs = buildQueries(normalizePrefs({ role: 'software engineer', locations: 'Bangalore' }));
+  const single = qs.filter((q) => q.domains.length <= 2).map((q) => q.label);
+  assert.deepEqual(single, ['Greenhouse', 'Lever', 'Ashby', 'Workday', 'SmartRecruiters and Workable']);
+  assert.ok(qs.length <= 8);
+});
+
+test('builds Workday jobs from a plain links list', () => {
+  const jobs = workdayJobsFromLinks([
+    'https://acme.wd5.myworkdayjobs.com/en-US/Site/job/Bangalore-India/Software-Engineer--Java-_2001234',
+    '/en-US/Site/job/Remote-USA/Senior-SWE_R2',
+    'https://www.acme.com/privacy',
+  ], { boardUrl: 'https://acme.wd5.myworkdayjobs.com/en-US/Site', company: 'Acme' });
+  assert.deepEqual(jobs.map((j) => j.title), ['Software Engineer Java', 'Senior SWE']);
+  assert.equal(jobs[0].location, 'Bangalore India');
+});
+
+test('recovers real Workday titles and dates from page text', () => {
+  const text = 'Jobs\nSoftware Engineer (Embedded C++) 4-10 years\nPosted 5 Days Ago\nLead Software Engineer\nPosted Yesterday\nLead Software Engineer\nPosted 30+ Days Ago';
+  const jobs = workdayJobsFromLinks([
+    'https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore-India/Software-Engineer--Embedded-C--4-10-years_2001',
+    'https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore-India/Lead-Software-Engineer_R1',
+    'https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore-India/Lead-Software-Engineer_R2',
+  ], { boardUrl: 'https://cisco.wd5.myworkdayjobs.com/C', company: 'Cisco' }, text);
+  assert.equal(jobs[0].title, 'Software Engineer (Embedded C++) 4-10 years');
+  assert.ok(jobs[0].postedAt);
+  assert.notEqual(jobs[1].postedAt, jobs[2].postedAt, 'same title, each gets its own date');
+  assert.equal(workdayLocationFromUrl('https://visa.wd5.myworkdayjobs.com/en-US/V/job/IN-Bengaluru-India/X_R1'), 'IN Bengaluru India');
+});
+
+test('dedupes Workday jobs by job ID across URL forms', () => {
+  assert.equal(
+    canonicalUrl('https://cisco.wd5.myworkdayjobs.com/en-US/C/job/Bangalore-India/Software-Engineer_2001234'),
+    canonicalUrl('https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore/Software-Engineer-Java_2001234/apply'));
+});
+
+test('reads JSON from an HTML Fetch result', () => {
+  const json = JSON.stringify([{ description: '<div>Say &quot;hi&quot;</div>' }]);
+  const esc = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  assert.equal(parseJsonFromHtml(`<html><body><pre>${esc}</pre></body></html>`)[0].description, '<div>Say &quot;hi&quot;</div>');
+  assert.deepEqual(parseJsonFromHtml('{"a":1}'), { a: 1 });
+  assert.equal(parseJsonFromHtml('<html><body>Access denied</body></html>'), null);
 });
 
 test('prefs are validated and capped', () => {

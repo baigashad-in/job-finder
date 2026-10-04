@@ -34,6 +34,25 @@ test('time waiting in the TinyFish queue does not count against the run limit', 
   assert.match(stuck.error.message, /Still queued/);
 });
 
+test('Agent stops starting runs after repeated failures', async (t) => {
+  const mock = await startMock();
+  t.after(() => mock.server.close());
+  process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
+  process.env.AGENT_POLL_MS = '30';
+  process.env.DATA_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'jf-edge-'));
+  const { TinyFish } = require('../src/tinyfish');
+  const { runAgents } = require('../src/agent');
+  const { normalizePrefs } = require('../src/match');
+  const store = require('../src/store');
+  const tf = new TinyFish({ apiKey: 'test-key' });
+  const targets = [1, 2, 3, 4].map((i) => ({ ats: 'custom', token: `failco${i}`, url: `https://failco${i}.test/jobs`, company: `Failco ${i}` }));
+  const warnings = [];
+  const out = await runAgents(targets, normalizePrefs({ role: 'software engineer' }), tf, () => {}, warnings, true, store);
+  assert.ok(tf.stats.agent.runs >= 2 && tf.stats.agent.runs <= 3, `runs: ${tf.stats.agent.runs}`);
+  assert.ok(out.agentReport.some((r) => r.status === 'skipped'));
+  assert.ok(warnings.some((w) => /none succeeded/.test(w)));
+});
+
 test('a bad API key gives a clear error', async (t) => {
   const mock = await startMock();
   t.after(() => mock.server.close());

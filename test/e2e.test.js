@@ -45,6 +45,9 @@ test('full pipeline against mock TinyFish', async (t) => {
   await t.test('stealth retry happened only for the blocked site', () => {
     const profiles = mock.st.calls.agentStart.map((b) => `${new URL(b.url).hostname}:${b.browser_profile}`);
     assert.deepEqual(profiles.sort(), ['careers.vandelay.com:lite', 'umbrella.wd5.myworkdayjobs.com:lite', 'umbrella.wd5.myworkdayjobs.com:stealth']);
+    const wd = mock.st.calls.agentStart.find((b) => b.url.includes('umbrella'));
+    assert.equal(wd.url, 'https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=intern%20software%20engineer', 'Workday run starts on filtered results');
+    assert.match(wd.goal, /^Goal: read the job search results already shown/);
     const stealth = mock.st.calls.agentStart.find((b) => b.browser_profile === 'stealth');
     assert.deepEqual(stealth.proxy_config, { enabled: true, country_code: 'US' });
   });
@@ -63,6 +66,13 @@ test('full pipeline against mock TinyFish', async (t) => {
       'Umbrella | Software Engineer Intern',
     ];
     assert.deepEqual([...titles].sort(), expected);
+  });
+
+  await t.test('a feed that breaks as markdown is read again as HTML', () => {
+    const row = r1.boards.find((b) => b.ats === 'lever' && /globex/i.test(b.url));
+    assert.equal(row.via, 'feed (html)');
+    assert.equal(row.jobs, 3);
+    assert.ok(r1.listings.some((l) => l.title === 'Backend Software Engineer Intern'));
   });
 
   await t.test('filters with the right reasons', () => {
@@ -144,6 +154,18 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.equal(row.jobs, 2, 'same 2 jobs on both query pages, counted once');
     assert.equal(row.via, 'search page');
     assert.ok(!r7.listings.some((l) => /Infrastructure/.test(l.title)), 'Austin job filtered by location');
+  });
+
+  mock.st.workdayLinksOnly = true;
+  const r8 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
+  mock.st.workdayLinksOnly = false;
+  await t.test('Workday jobs come from Fetch links list when the page text has no links', () => {
+    assert.equal(r8.usage.agent.runs, 1, 'only Vandelay needs the Agent');
+    const um = r8.listings.find((l) => l.company === 'Umbrella');
+    assert.equal(um.title, 'Software Engineer Intern (C++)', 'real title from the page text, not the slug');
+    assert.ok(um.postedAt, 'posted date read from the line under the title');
+    assert.equal(r8.listings.filter((l) => l.company === 'Umbrella').length, 1, 'same job ID from Search and Fetch merged');
+    assert.ok(um.sources.includes('fetch:workday'));
   });
 
   const r5 = await runPipeline({ ...PREFS, role: 'data analyst', seniority: 'any', visa: 'any', locations: '', companies: '', maxAgentRuns: 0 }, { tf: new TinyFish(), store });

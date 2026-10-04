@@ -3,21 +3,28 @@
 // Shows what TinyFish Fetch returns for one URL, to diagnose pages the app cannot read.
 //   node --env-file=.env debug-fetch.js "https://cisco.wd5.myworkdayjobs.com/en-US/Cisco_Careers" "software engineer"
 // With a second argument and no "?" in the URL, it adds ?q=<words> (Workday search).
+// Add --html to ask Fetch for HTML instead of markdown (useful for JSON feeds):
+//   node --env-file=.env debug-fetch.js "https://api.lever.co/v0/postings/hevodata?mode=json" --html
 // It never prints your API key.
 
 const { TinyFish } = require('./src/tinyfish');
+const { parseJsonText, parseJsonFromHtml } = require('./src/ats');
 
 async function main() {
-  let url = process.argv[2];
-  const words = process.argv[3];
+  const args = process.argv.slice(2);
+  const html = args.includes('--html');
+  const rest = args.filter((a) => a !== '--html');
+  let url = rest[0];
+  const words = rest[1];
   if (!url) {
     console.log('Usage: node --env-file=.env debug-fetch.js "<url>" ["search words"]');
     process.exit(1);
   }
   if (words && !url.includes('?')) url = `${url.replace(/\/$/, '')}?q=${encodeURIComponent(words)}`;
-  console.log(`Fetching ${url}\n`);
+  const format = html ? 'html' : 'markdown';
+  console.log(`Fetching ${url} as ${format}\n`);
   const tf = new TinyFish();
-  const res = await tf.fetchUrls([url], { ttl: 0, links: true, perUrlTimeoutMs: 90000 });
+  const res = await tf.fetchUrls([url], { ttl: 0, links: true, format, perUrlTimeoutMs: 90000 });
   if (res.errors.length) {
     console.log('Fetch error:', JSON.stringify(res.errors[0]));
     return;
@@ -35,6 +42,9 @@ async function main() {
   console.log(`text length:      ${text.length} characters`);
   console.log(`links in text:    ${mdLinks.length} (${mdJobLinks.length} contain /job/)`);
   console.log(`links list:       ${links.length} (${jobLinks.length} contain /job/)`);
+  const json = html ? parseJsonFromHtml(text) : parseJsonText(text);
+  const shape = !json ? 'not valid JSON' : Array.isArray(json) ? `array of ${json.length} items` : `object with keys ${Object.keys(json).slice(0, 6).join(', ')}`;
+  console.log(`JSON:             ${shape}`);
   if (mdJobLinks.length) console.log(`\nFirst job links in text:\n  ${mdJobLinks.slice(0, 5).map((m) => `[${m[1]}] ${m[2]}`).join('\n  ')}`);
   if (jobLinks.length) console.log(`\nFirst job links in list:\n  ${jobLinks.slice(0, 5).join('\n  ')}`);
   console.log(`\nFirst 1500 characters of text:\n${text.slice(0, 1500)}`);
