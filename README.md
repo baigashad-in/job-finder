@@ -148,6 +148,8 @@ Every job gets points for each of these, and some rules remove a job completely.
 * **Keywords (12 points)** count more in the title than in the description. **Hidden words** remove a job.
 * **Freshness (10 points).** Newer postings rank higher. Postings older than your "posted within" setting are removed.
 
+**Typos in the role** are corrected only when not one job title matches: a role word that appears in no title but is one or two letters away from a common title word ("sofatware" and "software") is replaced, and the results say so. This happens before Workday and the Agent read anything, so they use the corrected words too.
+
 **Duplicates** are merged when two results share the same cleaned link, or the same company, title and location. The merged row keeps the most complete copy and lists every source that found it.
 
 Below the results, the app tells you how many jobs were removed for each reason, so an empty result explains itself ("location (120)") and suggests what to change.
@@ -164,7 +166,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-52 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+54 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 

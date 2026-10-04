@@ -291,6 +291,18 @@ test('cleans board-style company names', () => {
   assert.equal(jobs[0].company, 'Rubrik');
 });
 
+test('corrects typos in the role only against real title words', () => {
+  const { correctRole } = require('../src/match');
+  const titles = ['Software Engineer', 'Senior Software Engineer', 'Software Engineer II', 'Staff Software Engineer', 'Backend Engineer',
+    'Frontend Developer', 'React Developer', 'Data Scientist', 'Product Manager', 'Engineering Manager', 'Data Analyst', 'Security Engineer'];
+  // Typo from a live run.
+  assert.equal(correctRole('sofatware engineer', titles).role, 'software engineer');
+  assert.deepEqual(correctRole('softwre enginer', titles).changes, [['softwre', 'software'], ['enginer', 'engineer']]);
+  assert.equal(correctRole('software engineer', titles), null, 'nothing to fix');
+  assert.equal(correctRole('bioinformatics scientist', titles), null, 'no close title word');
+  assert.equal(correctRole('sofatware engineer', ['Software Engineer']), null, 'too few titles to judge');
+});
+
 test('prefs are validated and capped', () => {
   assert.throws(() => normalizePrefs({ role: '' }), /Add a role/);
   const p = normalizePrefs({ role: 'x', maxAgentRuns: 99, postedWithinDays: -5, seniority: 'wizard', locations: 'Remote' });

@@ -236,6 +236,7 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
   </section>
 
   <section id="results" hidden>
+    <p class="usage" id="roleNote" hidden></p>
     <p class="summary" id="summary"></p>
     <p class="usage" id="usage"></p>
     <div class="toolbar" role="group" aria-label="Filter results">
@@ -410,6 +411,8 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
   function render(r, fresh) {
     state.result = r;
     $('results').hidden = false;
+    $('roleNote').hidden = !r.roleNote;
+    $('roleNote').textContent = r.roleNote || '';
     $('summary').textContent = summaryText(r);
     $('usage').textContent = usageText(r.usage);
     renderJobs(fresh);
@@ -476,7 +479,7 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
       ? `No matches yet. ${plural(r.counts.unique, 'job')} were read and filtered out.`
       : 'No jobs were read. Check the notes below, add companies to always check, or try a broader role.' }));
     if (top.length) {
-      const hints = { role: 'try a broader role name', level: 'set the level to any', location: 'add Remote or another city', visa: 'untick "Hide jobs that say no sponsorship" to see them', fresh: 'allow older postings', keywords: 'remove a hidden word' };
+      const hints = { role: 'check the spelling or try a broader role name', level: 'set the level to any', location: 'add Remote or another city', visa: 'untick "Hide jobs that say no sponsorship" to see them', fresh: 'allow older postings', keywords: 'remove a hidden word' };
       empty.append(el('p', { text: `Filtered out by: ${top.map(([k, v]) => `${k} (${v})`).join(', ')}. To widen the search, ${hints[top[0][0]] || 'loosen your filters'}.` }));
     }
   }

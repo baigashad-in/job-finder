@@ -192,9 +192,17 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.equal(r9.usage.agent.runs, 2);
   });
 
+  const r10 = await runPipeline({ ...PREFS, role: 'sofatware engineer' }, { tf: new TinyFish(), store });
+  await t.test('a typo in the role is corrected when nothing matches', () => {
+    assert.match(r10.roleNote, /"sofatware" looked like a typo for "software"/);
+    assert.equal(r10.prefs.role, 'software engineer');
+    assert.deepEqual(r10.listings.map((l) => l.title).sort(), r3.listings.map((l) => l.title).sort(), 'same jobs as the correctly spelled search on the same boards');
+  });
+
   const r5 = await runPipeline({ ...PREFS, role: 'data analyst', seniority: 'any', visa: 'any', locations: '', companies: '', maxAgentRuns: 0 }, { tf: new TinyFish(), store });
   await t.test('different role returns nothing from these engineering boards', () => {
     assert.equal(r5.listings.length, 0);
+    assert.equal(r5.roleNote, null, 'a real role with no matches is not "corrected"');
     assert.ok(r5.filteredOut.role > 5);
   });
 });

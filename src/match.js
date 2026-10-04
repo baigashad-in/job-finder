@@ -97,6 +97,44 @@ function scoreRole(listing, p) {
   return { score: 0, drop: true, reason: 'title does not match role' };
 }
 
+// Edit distance with swapped letters counted as one change ("teh" -> "the").
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// A typo in the role ("sofatware engineer") matches no title at all. A role word that is in
+// none of the job titles just read, but is one letter (two for long words) away from a word
+// used in at least 3 titles, is replaced by that word. Returns null when nothing looks like a typo.
+function correctRole(role, titles) {
+  const freq = new Map();
+  for (const t of titles) for (const w of new Set(String(t).toLowerCase().match(/[a-z]{3,}/g) || [])) freq.set(w, (freq.get(w) || 0) + 1);
+  if (freq.size < 10) return null; // too few titles to judge
+  const changes = [];
+  const fixed = (String(role).toLowerCase().match(/[a-z]+|[^a-z]+/g) || []).map((w) => {
+    if (!/^[a-z]{4,}$/.test(w) || freq.has(w)) return w;
+    const max = w.length >= 8 ? 2 : 1;
+    let best = null;
+    for (const [v, n] of freq) {
+      if (n < 3 || Math.abs(v.length - w.length) > max) continue;
+      const dist = editDistance(w, v);
+      if (dist <= max && (!best || dist < best.dist || (dist === best.dist && n > best.n))) best = { v, n, dist };
+    }
+    if (!best) return w;
+    changes.push([w, best.v]);
+    return best.v;
+  });
+  return changes.length ? { role: fixed.join(''), changes } : null;
+}
+
 // ===== seniority =====
 const LEVEL_LABEL = { intern: 'Intern', entry: 'Entry / new grad', mid: 'Mid', senior: 'Senior', staff: 'Staff+', manager: 'Manager', unspecified: 'Level not stated' };
 
@@ -440,5 +478,5 @@ function normalizePrefs(raw = {}) {
 
 module.exports = {
   normalizePrefs, evaluate, dedupe, canonicalUrl, detectLevel, detectVisa, scoreLocation,
-  isRemote, roleExpansions, inferCountry, LEVEL_LABEL, norm, toks,
+  isRemote, roleExpansions, inferCountry, scoreRole, correctRole, editDistance, LEVEL_LABEL, norm, toks,
 };

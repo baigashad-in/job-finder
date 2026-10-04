@@ -7,7 +7,7 @@
 //  5 Fetch   -> read top posting pages for visa notes, dates, closed jobs (read.js)
 //  6 Rank    -> score, filter, sort, mark "new since last run"
 
-const { normalizePrefs, evaluate, dedupe, LEVEL_LABEL } = require('./match');
+const { normalizePrefs, evaluate, dedupe, scoreRole, correctRole, roleExpansions, LEVEL_LABEL } = require('./match');
 const { discover } = require('./discover');
 const { readFeeds, readWorkdayBoards, enrich } = require('./read');
 const { runAgents } = require('./agent');
@@ -47,6 +47,20 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   log('step', `Reading ${plural(useBoards.length, 'job board')} with TinyFish Fetch`);
   const feeds = await readFeeds(useBoards, p, tf, log, warnings, force);
   log('fetch', `Boards returned ${plural(feeds.listings.length, 'open job')} in total`);
+
+  // If not one job title matches the role, check it for typos against the titles just read
+  // ("sofatware" -> "software"). This runs before Workday and the Agent, so they search
+  // with the corrected words too.
+  let roleNote = null;
+  if (p.role && feeds.listings.length && !feeds.listings.some((l) => !scoreRole(l, p).drop)) {
+    const fix = correctRole(p.role, feeds.listings.map((l) => l.title));
+    if (fix) {
+      roleNote = `Showing results for "${fix.role}": ${fix.changes.map(([a, b]) => `"${a}" looked like a typo for "${b}"`).join(', ')}.`;
+      log('step', roleNote);
+      p.role = fix.role;
+      p.expansions = roleExpansions(fix.role);
+    }
+  }
 
   // 3a. Workday: Fetch the search results page first (free). Only failures go to the Agent.
   const workday = targets.filter((t) => t.ats === 'workday').slice(0, MAX_BOARDS);
@@ -151,6 +165,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const result = {
     searchId,
     prefs: p,
+    roleNote,
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - started,
     firstRun: seen.firstRun,
