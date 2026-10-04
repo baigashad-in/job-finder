@@ -215,7 +215,11 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
       return [];
     }
     successes++;
-    store.setAgentCache(cacheKey, parsed);
+    try {
+      store.setAgentCache(cacheKey, parsed);
+    } catch (err) {
+      log('warn', `Could not save the Agent cache: ${err.message}`);
+    }
     log('agent', `${t.company}: Agent returned ${plural(parsed.jobs.length, 'posting')} in ${run.num_of_steps || '?'} steps`);
     report.push({ company: t.company, url: t.url, ats: t.ats, status: 'done', jobs: parsed.jobs.length, steps: run.num_of_steps || null });
     return toListings(parsed, t);

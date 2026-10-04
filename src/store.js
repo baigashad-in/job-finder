@@ -17,11 +17,29 @@ function ensureDir(d) {
 function readJson(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+let tmpCounter = 0;
+
+// Write to a temporary file, then rename it over the real one, so a crash never leaves
+// half a file. On Windows the rename can fail with EPERM, EACCES or EBUSY while another
+// program (often antivirus) has the file open for a moment, so retry a few times and,
+// if it still fails, write the file directly.
 function writeJson(file, value) {
   ensureDir(path.dirname(file));
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 1));
-  fs.renameSync(tmp, file); // atomic replace
+  const body = JSON.stringify(value, null, 1);
+  const tmp = `${file}.${process.pid}.${++tmpCounter}.tmp`;
+  fs.writeFileSync(tmp, body);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (err) {
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(err.code)) throw err;
+      sleepSync(30 * (attempt + 1));
+    }
+  }
+  fs.writeFileSync(file, body);
+  try { fs.unlinkSync(tmp); } catch { /* leftover temp file is harmless */ }
 }
 function hash(s) {
   return crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 12);

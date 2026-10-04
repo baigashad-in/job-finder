@@ -53,6 +53,44 @@ test('Agent stops starting runs after repeated failures', async (t) => {
   assert.ok(warnings.some((w) => /none succeeded/.test(w)));
 });
 
+test('saving survives Windows file locks (EPERM on rename)', () => {
+  // Seen on Windows: antivirus briefly holds the file and the rename fails with EPERM.
+  const fs = require('fs');
+  const store = require('../src/store');
+  const orig = fs.renameSync;
+  const eperm = () => { const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM'; throw e; };
+  let calls = 0;
+  fs.renameSync = (...a) => { calls++; if (calls <= 2) eperm(); return orig(...a); };
+  try { store.setAgentCache('lock-1', { jobs: [1] }); } finally { fs.renameSync = orig; }
+  assert.ok(calls >= 3, 'retried until the lock was gone');
+  assert.deepEqual(store.getAgentCache('lock-1', 1), { jobs: [1] });
+  fs.renameSync = eperm;
+  try { store.setAgentCache('lock-2', { jobs: [2] }); } finally { fs.renameSync = orig; }
+  assert.deepEqual(store.getAgentCache('lock-2', 1), { jobs: [2] }, 'fell back to writing the file directly');
+});
+
+test('a failed cache save does not fail the Agent run', async (t) => {
+  const mock = await startMock();
+  t.after(() => mock.server.close());
+  process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
+  process.env.AGENT_POLL_MS = '30';
+  const { TinyFish } = require('../src/tinyfish');
+  const { runAgents } = require('../src/agent');
+  const { normalizePrefs } = require('../src/match');
+  const store = require('../src/store');
+  const orig = store.setAgentCache;
+  store.setAgentCache = () => { const e = new Error('EPERM: operation not permitted'); e.code = 'EPERM'; throw e; };
+  const logs = [];
+  try {
+    const out = await runAgents([{ ats: 'custom', token: 'vandelay', url: 'https://careers.vandelay.com/jobs', company: 'Vandelay' }],
+      normalizePrefs({ role: 'software engineer' }), new TinyFish({ apiKey: 'test-key' }), (k, m) => logs.push(m), [], true, store);
+    assert.equal(out.listings.length, 2, 'the jobs the Agent found are still returned');
+  } finally {
+    store.setAgentCache = orig;
+  }
+  assert.ok(logs.some((m) => /Could not save the Agent cache/.test(m)));
+});
+
 test('a bad API key gives a clear error', async (t) => {
   const mock = await startMock();
   t.after(() => mock.server.close());

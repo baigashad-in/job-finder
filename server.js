@@ -15,7 +15,7 @@ const store = require('./src/store');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const REFRESH_HOURS = Number(process.env.REFRESH_HOURS || 0);
-const VERSION = '10.0.0';
+const VERSION = '11.0.0';
 const INDEX = path.join(__dirname, 'public', 'index.html');
 
 const tasks = new Map(); // id -> { status, log, result, error, startedAt }
@@ -58,8 +58,12 @@ function startTask(prefs, { force = false, label = 'search' } = {}) {
     try {
       const tf = new TinyFish({ log: (m) => log('warn', m) });
       const result = await runPipeline(prefs, { tf, store, log, force });
-      store.saveLatest(result.searchId, result);
-      store.touchSearch(result.searchId, { matched: result.counts.matched, fresh: result.counts.newSinceLastRun });
+      try {
+        store.saveLatest(result.searchId, result);
+        store.touchSearch(result.searchId, { matched: result.counts.matched, fresh: result.counts.newSinceLastRun });
+      } catch (err) {
+        log('warn', `Results are shown but could not be saved: ${err.message}`);
+      }
       task.result = result;
       task.status = 'done';
     } catch (err) {

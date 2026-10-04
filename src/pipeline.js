@@ -115,7 +115,13 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   }
   matched.sort((a, b) => b.e.score - a.e.score || String(b.l.postedAt || '').localeCompare(String(a.l.postedAt || '')));
 
-  const seen = store.markSeen(searchId, matched.map(({ l }) => l.key));
+  let seen;
+  try {
+    seen = store.markSeen(searchId, matched.map(({ l }) => l.key));
+  } catch (err) {
+    warnings.push(`Could not save which jobs you have seen, so nothing is marked new this time: ${err.message}`);
+    seen = { firstRun: true, isNew: () => false, firstSeen: () => null };
+  }
   const out = matched.slice(0, MAX_RESULTS).map(({ l, e }) => ({
     key: l.key,
     title: l.title,

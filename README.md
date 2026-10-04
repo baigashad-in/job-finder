@@ -164,7 +164,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-50 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+52 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 
@@ -193,4 +193,4 @@ The end-to-end test checks that a full run uses all three APIs, returns exactly 
 * `src/match.js`: scoring, visa detection, location rules, dedupe
 * `src/pipeline.js`: runs the steps in order
 * `src/util.js`: concurrency pool, posted-date parsing, plurals
-* `src/store.js`: JSON files in `data/` for saved searches, seen jobs and the Agent cache
+* `src/store.js`: JSON files in `data/` for saved searches, seen jobs and the Agent cache (saves retry when Windows briefly locks a file, and a failed save never stops a search)
