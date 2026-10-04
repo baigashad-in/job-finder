@@ -15,7 +15,7 @@ const store = require('./src/store');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const REFRESH_HOURS = Number(process.env.REFRESH_HOURS || 0);
-const VERSION = '6.0.0';
+const VERSION = '7.0.0';
 const INDEX = path.join(__dirname, 'public', 'index.html');
 
 const tasks = new Map(); // id -> { status, log, result, error, startedAt }

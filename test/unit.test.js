@@ -51,6 +51,9 @@ test('detects seniority from titles', () => {
   assert.equal(detectLevel('Staff Engineer'), 'staff');
   assert.equal(detectLevel('Engineering Manager, Payments'), 'manager');
   assert.equal(detectLevel('Intermediate Backend Engineer - Database Change Management'), 'mid');
+  assert.equal(detectLevel('Software Engineer, Password Manager (PWM) - India'), 'unspecified');
+  assert.equal(detectLevel('Manager II, Software Engineering'), 'manager');
+  assert.equal(detectLevel('Senior Manager Software Engineering'), 'manager');
   assert.equal(detectLevel('Associate Product Manager', null, 'product manager'), 'entry');
   assert.equal(detectLevel('Product Manager', null, 'product manager'), 'unspecified');
 });
@@ -193,6 +196,9 @@ test('dedupes Workday jobs by job ID across URL forms', () => {
   assert.equal(
     canonicalUrl('https://cisco.wd5.myworkdayjobs.com/en-US/C/job/Bangalore-India/Software-Engineer_2001234'),
     canonicalUrl('https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore/Software-Engineer-Java_2001234/apply'));
+  assert.equal(
+    canonicalUrl('https://cba.wd3.myworkdayjobs.com/en-US/Private/details/Staff-Software-Engineer--Logo_REQ1'),
+    canonicalUrl('https://cba.wd3.myworkdayjobs.com/Private/job/Bangalore/Staff-Software-Engineer_REQ1'));
 });
 
 test('reads JSON from an HTML Fetch result', () => {

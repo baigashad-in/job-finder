@@ -61,14 +61,22 @@ const leverFeed = (format) => (format === 'html'
   ? `<html><body><pre>${escHtml(leverJson())}</pre></body></html>`
   : leverJson().replace(/<li>/g, '\n* ').replace(/<\/li>/g, ''));
 
-const ashbyInitech = () => JSON.stringify({ apiVersion: '1', jobs: [
+// Real Ashby feeds come back from Fetch markdown and html as only the HTML inside their
+// job descriptions (seen in a live run). Fetch json format returns structured data.
+const ashbyAs = (format, data, jsonWorks) => {
+  const descs = data.jobs.map((j) => j.descriptionPlain).join(' ') + ' About us. '.repeat(25);
+  if (format === 'json') return jsonWorks ? data : { type: 'document', children: [{ type: 'paragraph', text: descs }] };
+  if (format === 'html') return `<html>\n  <body><p>${descs}</p></body></html>`;
+  return descs;
+};
+const ashbyInitechData = () => ({ apiVersion: '1', jobs: [
   { id: 'i1', title: 'Software Engineer, New Grad', location: 'New York', publishedAt: ago(2), isListed: true, isRemote: false, jobUrl: 'https://jobs.ashbyhq.com/initech/i1', applyUrl: 'https://jobs.ashbyhq.com/initech/i1/application', descriptionPlain: 'TPS reports.' },
   { id: 'i2', title: 'Software Engineer Intern', location: 'London', publishedAt: ago(2), isListed: true, isRemote: false, jobUrl: 'https://jobs.ashbyhq.com/initech/i2', descriptionPlain: 'London office.' },
   { id: 'i3', title: 'ML Engineer Intern', location: 'New York', publishedAt: ago(6), isListed: true, isRemote: false, jobUrl: 'https://jobs.ashbyhq.com/initech/i3', descriptionPlain: 'PyTorch.' },
   { id: 'i4', title: 'Software Engineer Intern', location: 'New York', publishedAt: ago(1), isListed: false, jobUrl: 'https://jobs.ashbyhq.com/initech/i4', descriptionPlain: 'Unlisted.' },
 ] });
 
-const ashbyPiedPiper = () => JSON.stringify({ apiVersion: '1', jobs: [
+const ashbyPiedPiperData = () => ({ apiVersion: '1', jobs: [
   { id: 'p1', title: 'Software Engineer Intern (Compression)', location: 'Remote (US)', publishedAt: ago(3), isListed: true, isRemote: true,
     jobUrl: 'https://jobs.ashbyhq.com/piedpiper/p1', applyUrl: 'https://jobs.ashbyhq.com/piedpiper/p1/application',
     descriptionPlain: 'Middle-out compression in Python. Are you authorized to work in the US without sponsorship? We support students on OPT and CPT.',
@@ -83,6 +91,7 @@ const smartHooli = () => JSON.stringify({ offset: 0, limit: 100, totalFound: 2, 
 ] });
 
 const PAGES = {
+  'https://jobs.ashbyhq.com/piedpiper/p1': '# Software Engineer Intern (Compression)\nRemote (US)\nMiddle-out compression in Python. Are you authorized to work in the US without sponsorship? We support students on OPT and CPT.',
   'https://jobs.smartrecruiters.com/Hooli/7441': '# Software Engineer Intern\nHooli, New York\nWork on search. Visa sponsorship is available for this role. Python a plus.',
   'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern_R123': '# Software Engineer Intern\nLocations\nNew York, NY\nPosted 3 Days Ago\nWe will provide visa sponsorship for eligible candidates. Python, Java.',
   'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/Austin/Software-Engineer-Intern-Infra_R124': '# Software Engineer Intern, Infrastructure\nLocations\nAustin, TX',
@@ -93,8 +102,9 @@ const PAGES = {
 function fetchOne(url, st, format) {
   if (url.startsWith('https://boards-api.greenhouse.io/v1/boards/acme/jobs')) return { text: greenhouseFeed(st) };
   if (url.startsWith('https://api.lever.co/v0/postings/globex')) return { text: leverFeed(format) };
-  if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/initech')) return { text: ashbyInitech() };
-  if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/piedpiper')) return { text: ashbyPiedPiper() };
+  if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/initech')) return { text: ashbyAs(format, ashbyInitechData(), true) };
+  // Pied Piper: even json format gives no jobs, so the Agent reads its board page.
+  if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/piedpiper')) return { text: ashbyAs(format, ashbyPiedPiperData(), false) };
   if (url.startsWith('https://api.smartrecruiters.com/v1/companies/Hooli/postings')) return { text: smartHooli() };
   if (PAGES[url]) return { text: PAGES[url], title: PAGES[url].split('\n')[0].replace('# ', '') };
   if (st.workdayLinksOnly && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
@@ -143,6 +153,11 @@ function agentResult(run, st) {
       { title: 'Software Engineer Intern', location: 'New York, NY', posted: 'Posted 3 Days Ago', url: '/en-US/External/job/New-York/Software-Engineer-Intern_R123', department: null },
       { title: 'Software Engineer Intern, Infrastructure', location: 'Austin, TX', posted: 'Posted Yesterday', url: '/en-US/External/job/Austin/Software-Engineer-Intern-Infra_R124' },
       { title: 'Software Engineer Intern', location: 'New York, NY', posted: null, url: 'javascript:alert(1)' },
+    ] };
+  }
+  if (run.url.includes('jobs.ashbyhq.com/piedpiper')) {
+    return { company: 'Pied Piper', blocked: false, jobs: [
+      { title: 'Software Engineer Intern (Compression)', location: 'Remote (US)', posted: 'Posted 3 days ago', url: 'https://jobs.ashbyhq.com/piedpiper/p1' },
     ] };
   }
   if (run.url.includes('vandelay')) {

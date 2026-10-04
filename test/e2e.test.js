@@ -9,7 +9,7 @@ const { startMock } = require('./mock-tinyfish');
 const PREFS = {
   role: 'software engineer', seniority: 'intern', locations: 'New York; Remote', country: 'US',
   visa: 'need', keywords: 'python', exclude: 'clearance', companies: 'Hooli\nPied Piper\nVandelay',
-  postedWithinDays: 30, maxAgentRuns: 2,
+  postedWithinDays: 30, maxAgentRuns: 3,
 };
 
 test('full pipeline against mock TinyFish', async (t) => {
@@ -37,14 +37,14 @@ test('full pipeline against mock TinyFish', async (t) => {
   await t.test('uses all three TinyFish APIs', () => {
     assert.ok(r1.usage.search.calls >= 4, 'search used');
     assert.ok(r1.usage.fetch.calls >= 3, 'fetch used');
-    assert.equal(r1.usage.agent.runs, 3, 'umbrella lite + stealth retry, vandelay');
+    assert.equal(r1.usage.agent.runs, 4, 'umbrella lite + stealth retry, vandelay, pied piper ashby board');
     for (const f of mock.st.calls.fetch) assert.ok(f.urls.length <= 10);
     for (const s of mock.st.calls.search) assert.ok(s.include_domains || s.exclude_domains, 'search is scoped');
   });
 
   await t.test('stealth retry happened only for the blocked site', () => {
     const profiles = mock.st.calls.agentStart.map((b) => `${new URL(b.url).hostname}:${b.browser_profile}`);
-    assert.deepEqual(profiles.sort(), ['careers.vandelay.com:lite', 'umbrella.wd5.myworkdayjobs.com:lite', 'umbrella.wd5.myworkdayjobs.com:stealth']);
+    assert.deepEqual(profiles.sort(), ['careers.vandelay.com:lite', 'jobs.ashbyhq.com:lite', 'umbrella.wd5.myworkdayjobs.com:lite', 'umbrella.wd5.myworkdayjobs.com:stealth']);
     const wd = mock.st.calls.agentStart.find((b) => b.url.includes('umbrella'));
     assert.equal(wd.url, 'https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=intern%20software%20engineer', 'Workday run starts on filtered results');
     assert.match(wd.goal, /^Goal: read the job search results already shown/);
@@ -53,7 +53,7 @@ test('full pipeline against mock TinyFish', async (t) => {
   });
 
   await t.test('reports a live browser link for each Agent run', () => {
-    assert.equal(links.length, 3, 'two first runs plus the stealth retry');
+    assert.equal(links.length, 4, 'three first runs plus the stealth retry');
     assert.ok(links.every((u) => u.startsWith('https://live.example.test/run_')));
   });
 
@@ -66,6 +66,17 @@ test('full pipeline against mock TinyFish', async (t) => {
       'Umbrella | Software Engineer Intern',
     ];
     assert.deepEqual([...titles].sort(), expected);
+  });
+
+  await t.test('Ashby: json format when it works, otherwise the Agent reads the board', () => {
+    const initech = r1.boards.find((b) => b.ats === 'ashby' && /initech/.test(b.url));
+    assert.equal(initech.via, 'feed (json)');
+    assert.equal(initech.jobs, 3);
+    const ppRun = mock.st.calls.agentStart.find((b) => b.url === 'https://jobs.ashbyhq.com/piedpiper');
+    assert.match(ppRun.goal, /^Goal: list the open jobs on this company job board/);
+    const pp = r1.listings.find((l) => l.company === 'Pied Piper');
+    assert.ok(pp.sources.includes('agent:ashby'));
+    assert.equal(pp.visa.status, 'opt', 'description read by Fetch from the posting page');
   });
 
   await t.test('a feed that breaks as markdown is read again as HTML', () => {
@@ -111,7 +122,7 @@ test('full pipeline against mock TinyFish', async (t) => {
   const r2 = await runPipeline(PREFS, { tf: new TinyFish(), store });
   await t.test('second run uses the Agent cache and marks nothing new', () => {
     assert.equal(r2.usage.agent.runs, 0);
-    assert.equal(r2.usage.agent.cached, 2);
+    assert.equal(r2.usage.agent.cached, 3);
     assert.equal(r2.firstRun, false);
     assert.equal(r2.counts.newSinceLastRun, 0);
     assert.equal(r2.listings.length, r1.listings.length);
@@ -123,7 +134,7 @@ test('full pipeline against mock TinyFish', async (t) => {
     const fresh = r3.listings.filter((l) => l.isNew);
     assert.equal(fresh.length, 1);
     assert.equal(fresh[0].title, 'Software Engineer Intern, Perception');
-    assert.equal(r3.usage.agent.runs, 3, 'force skips the Agent cache');
+    assert.equal(r3.usage.agent.runs, 4, 'force skips the Agent cache');
     const forcedFetch = mock.st.calls.fetch.slice(-6).some((f) => f.ttl === 0);
     assert.ok(forcedFetch, 'force sends ttl 0 to Fetch');
   });
@@ -147,7 +158,7 @@ test('full pipeline against mock TinyFish', async (t) => {
   const r7 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
   mock.st.workdayPage = false;
   await t.test('Workday is read by Fetch first, so the Agent only runs where Fetch failed', () => {
-    assert.equal(r7.usage.agent.runs, 1, 'only Vandelay (custom site) needs the Agent');
+    assert.equal(r7.usage.agent.runs, 2, 'only Vandelay (custom site) and the Pied Piper Ashby board need the Agent');
     const um = r7.listings.find((l) => l.company === 'Umbrella');
     assert.ok(um.sources.includes('fetch:workday'));
     const row = r7.boards.find((b) => b.ats === 'workday');
@@ -160,7 +171,7 @@ test('full pipeline against mock TinyFish', async (t) => {
   const r8 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
   mock.st.workdayLinksOnly = false;
   await t.test('Workday jobs come from Fetch links list when the page text has no links', () => {
-    assert.equal(r8.usage.agent.runs, 1, 'only Vandelay needs the Agent');
+    assert.equal(r8.usage.agent.runs, 2, 'only Vandelay and Pied Piper need the Agent');
     const um = r8.listings.find((l) => l.company === 'Umbrella');
     assert.equal(um.title, 'Software Engineer Intern (C++)', 'real title from the page text, not the slug');
     assert.ok(um.postedAt, 'posted date read from the line under the title');

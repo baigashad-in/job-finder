@@ -107,7 +107,10 @@ function detectLevel(title, hint, roleText) {
       / (summer|fall|spring|winter) 20\d\d /.test(t)) return 'intern';
   if (/ (staff|principal|distinguished|fellow) /.test(t)) return 'staff';
   if (/ (director|head|vp|vice president|chief) /.test(t)) return 'manager';
-  if (!roleHasManager && / (engineering manager|manager) /.test(t) && !/ product manager /.test(t)) return 'manager';
+  // Only people-manager titles: "Engineering Manager", "Senior Manager...", "Manager II, ...".
+  // "Password Manager (PWM)" in a team name is not a level.
+  if (!roleHasManager && !/ product manager /.test(t) &&
+      (/ (engineering|software|development|delivery|people|group|program|senior|sr|associate) manager /.test(t) || /^ manager /.test(t))) return 'manager';
   if (/ (senior|sr|lead|iii|iv) /.test(t)) return 'senior';
   if (/ (new grad|new graduate|graduate|grad|entry level|entry|junior|jr|early career|university|campus|associate) /.test(t) ||
       / (engineer|developer|scientist|analyst|designer) i /.test(t)) return 'entry';
@@ -347,7 +350,7 @@ function canonicalUrl(u) {
   let path = x.pathname.replace(/\/+$/, '').replace(/\/(apply|application)$/i, '');
   // Workday shows one job under several URLs (with or without /en-US/, different slugs).
   // The ID after the last "_" (R12345, JR-001) is what identifies it.
-  if (host.endsWith('.myworkdayjobs.com') && /\/job\//.test(path)) {
+  if (host.endsWith('.myworkdayjobs.com') && /\/(job|details)\//.test(path)) {
     const last = path.split('/').pop();
     return `${host}/job/${(last.includes('_') ? last.split('_').pop() : last).toLowerCase()}`;
   }

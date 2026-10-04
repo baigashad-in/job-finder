@@ -132,7 +132,9 @@ async function resolveCompany(entry, tf, p, log, acc, warnings) {
     for (const g of guesses) {
       const r = res.results.find((x) => x.url === g.url);
       const json = r ? parseJsonText(r.text) : null;
-      if (json && PARSERS[g.ats](json, { token: slug, company: entry }).length > 0) {
+      // Ashby feeds never parse as markdown, but a long answer (not a 404) means the board exists.
+      const reachable = !json && r && typeof r.text === 'string' && r.text.length > 200;
+      if ((json && PARSERS[g.ats](json, { token: slug, company: entry }).length > 0) || reachable) {
         const d = detectAts(g.board);
         log('fetch', `${entry}: confirmed ${g.ats} board by fetching its feed`);
         acc.boards.set(`${d.ats}:${d.token}`, { ...d, hits: 99, company: entry, from: 'watchlist' });

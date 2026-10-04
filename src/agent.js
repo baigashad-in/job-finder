@@ -71,6 +71,23 @@ function buildWorkdayGoal() {
   ].join('\n');
 }
 
+// Ashby and Lever board pages list every job on one page. When Fetch cannot read them
+// (Ashby boards are JavaScript apps), the Agent only has to read that list.
+function buildListGoal(p) {
+  const lvl = LEVEL_WORDS[p.seniority] || '';
+  const place = p.places[0] || '';
+  return [
+    'Goal: list the open jobs on this company job board that fit the role below. Work quickly.',
+    `Role: "${p.role}"${lvl ? `, level "${lvl}"` : ''}${place ? `, location "${place}"` : ''}${p.remoteOk ? ', remote is fine' : ''}.`,
+    'Steps:',
+    '1. Close any cookie or privacy banner.',
+    '2. Wait for the job list to appear. Do not use filters and do not open postings.',
+    `3. Read the whole list once. Collect up to ${MAX_JOBS} postings whose title fits the role${place ? `, preferring ones in "${place}" or remote` : ''}.`,
+    'Return: the company name, and for each posting its title, location as shown (or null), posted date text as shown (or null), department if shown (or null), and url, the full absolute link to the posting.',
+    'Rules: copy text exactly as shown. Do not invent postings or links. If nothing fits, return an empty jobs list. If you hit a captcha, a login wall or an access denied page, stop and set blocked to true.',
+  ].join('\n');
+}
+
 function findJobsArray(obj, depth = 0) {
   if (!obj || typeof obj !== 'object' || depth > 4) return null;
   if (Array.isArray(obj)) return obj.length && obj[0] && typeof obj[0] === 'object' && 'title' in obj[0] ? obj : null;
@@ -148,7 +165,8 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
   const lists = await pool(targets, 2, async (target) => {
     const isWorkday = target.ats === 'workday' && target.boardUrl;
     const t = isWorkday ? { ...target, url: `${target.boardUrl}?q=${encodeURIComponent(searchText)}` } : target;
-    const goal = isWorkday ? buildWorkdayGoal() : buildGoal(p);
+    const isBoardList = ['ashby', 'lever', 'greenhouse', 'smartrecruiters'].includes(target.ats);
+    const goal = isWorkday ? buildWorkdayGoal() : isBoardList ? buildListGoal(p) : buildGoal(p);
     const host = (safeUrl(t.url) || {}).hostname || t.url;
     const cacheKey = store.hash(`${t.url}|${goal}`);
     if (!force) {
@@ -208,4 +226,4 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
   return { listings: lists.flat(), agentReport: report };
 }
 
-module.exports = { runAgents, buildGoal, buildWorkdayGoal, parseAgentResult, toListings, OUTPUT_SCHEMA };
+module.exports = { runAgents, buildGoal, buildWorkdayGoal, buildListGoal, parseAgentResult, toListings, OUTPUT_SCHEMA };

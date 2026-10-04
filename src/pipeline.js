@@ -12,6 +12,7 @@ const { discover } = require('./discover');
 const { readFeeds, readWorkdayBoards, enrich } = require('./read');
 const { runAgents } = require('./agent');
 const { plural } = require('./util');
+const { prettyName } = require('./ats');
 
 const MAX_BOARDS = Number(process.env.MAX_BOARDS || 40);
 const ENRICH_LIMIT = Number(process.env.ENRICH_LIMIT || 20);
@@ -56,7 +57,9 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   }
 
   // 3b. Agent for sites Fetch could not read
-  const agentQueue = targets.filter((t) => t.ats !== 'workday' || wd.needAgent.includes(t));
+  // Job boards whose feed Fetch could not read (mostly Ashby) join the queue too.
+  const feedBoards = feeds.needAgent.map((b) => ({ ...b, kind: 'agent', url: b.boardUrl, company: b.company || prettyName(b.token) }));
+  const agentQueue = [...feedBoards, ...targets.filter((t) => t.ats !== 'workday' || wd.needAgent.includes(t))].sort(byPriority);
   const useTargets = agentQueue.slice(0, p.maxAgentRuns);
   if (agentQueue.length > useTargets.length) {
     warnings.push(`Skipped ${plural(agentQueue.length - useTargets.length, 'careers site')} because Agent runs are capped at ${p.maxAgentRuns}. Raise the cap to include them.`);

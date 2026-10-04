@@ -28,7 +28,7 @@ async function fetchChunks(tf, urls, opts) {
 }
 
 async function readFeeds(boards, p, tf, log, warnings, force) {
-  if (!boards.length) return { listings: [], boardReport: [] };
+  if (!boards.length) return { listings: [], boardReport: [], needAgent: [] };
   const ttl = force ? 0 : 3600; // accept a TinyFish cache entry up to 1 hour old unless refreshing
   const purpose = `Read the public job feed of each company to list open ${p.role} roles`;
   // SmartRecruiters returns at most 100 postings, so ask it for the role up front.
@@ -40,6 +40,7 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
   const retryLite = [];
   const retryPage = [];
   const retryHtml = [];
+  const retryJson = [];
 
   for (const b of boards) {
     const r = res.ok.get(feedUrlOf(b));
@@ -84,7 +85,7 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
     for (const b of retryHtml) {
       const r = html.ok.get(feedUrlOf(b));
       const json = r ? parseJsonFromHtml(r.text) : null;
-      if (!json) { retryPage.push(b); continue; }
+      if (!json) { retryJson.push(b); continue; }
       const items = PARSERS[b.ats](json, b);
       items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
       listings.push(...items);
@@ -92,21 +93,46 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
     }
   }
 
-  // Feed unreadable: read the human board page and pull job links out of it.
-  if (retryPage.length) {
-    log('fetch', `${plural(retryPage.length, 'feed')} unreadable, reading board pages instead`);
-    const pages = byRequestedUrl(await fetchChunks(tf, retryPage.map((b) => b.boardUrl), { ttl, purpose, links: false }));
-    for (const b of retryPage) {
+  // Still not JSON. Ashby feeds come back from both markdown and HTML as just the HTML
+  // inside their job descriptions. Fetch's json format returns structured data instead.
+  // A result only counts if it parses into jobs, so a plain document tree is not mistaken for a feed.
+  if (retryJson.length) {
+    log('fetch', `${plural(retryJson.length, 'feed')} did not parse as HTML either, retrying as Fetch json`);
+    const jres = byRequestedUrl(await fetchChunks(tf, retryJson.map(feedUrlOf), { ttl, purpose, format: 'json', perUrlTimeoutMs: 60000 }));
+    for (const b of retryJson) {
+      const r = jres.ok.get(feedUrlOf(b));
+      const json = r ? (typeof r.text === 'object' ? r.text : parseJsonText(r.text)) : null;
+      const items = json ? PARSERS[b.ats](json, b) : [];
+      if (!items.length) { retryPage.push(b); continue; }
+      items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
+      listings.push(...items);
+      report.push({ company: items[0].company, ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'feed (json)' });
+    }
+  }
+
+  // Feed unreadable: read the human board page and pull job links out of it. Ashby board
+  // pages are JavaScript apps that Fetch sees as empty, so those go straight to the Agent,
+  // as does any board page that yields no jobs.
+  const needAgent = [];
+  const pageBoards = retryPage.filter((b) => b.ats !== 'ashby');
+  for (const b of retryPage.filter((x) => x.ats === 'ashby')) {
+    needAgent.push(b);
+    report.push({ company: b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: 0, via: 'feed unreadable, sent to Agent' });
+  }
+  if (pageBoards.length) {
+    log('fetch', `${plural(pageBoards.length, 'feed')} unreadable, reading board pages instead`);
+    const pages = byRequestedUrl(await fetchChunks(tf, pageBoards.map((b) => b.boardUrl), { ttl, purpose, links: false }));
+    for (const b of pageBoards) {
       const r = pages.ok.get(b.boardUrl);
       const items = r ? jobLinksFromMarkdown(r.text, b) : [];
       items.forEach((x) => { x.sources = [`fetch:${b.ats}`]; });
       listings.push(...items);
       const e = pages.err.get(b.boardUrl);
-      report.push({ company: b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: items.length, via: 'board page', note: e ? e.error : undefined });
-      if (e) warnings.push(`Could not read ${b.boardUrl}: ${e.error}`);
+      if (!items.length) needAgent.push(b);
+      report.push({ company: b.company || prettyName(b.token), ats: b.ats, url: b.boardUrl, jobs: items.length, via: items.length ? 'board page' : 'board page empty, sent to Agent', note: e ? e.error : undefined });
     }
   }
-  return { listings, boardReport: report };
+  return { listings, boardReport: report, needAgent };
 }
 
 const CLOSED = /(no longer (available|accepting|open)|position has been filled|this job (is|has been) closed|job (posting )?(has )?expired|page you are looking for (doesn't|does not) exist|job not found)/i;
@@ -176,7 +202,12 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
       if (/\b0\s+jobs?\s+found\b/i.test(text)) zero = true;
       let found = workdayJobsFromMarkdown(text, t);
       if (!found.length && links.length) found = workdayJobsFromLinks(links, t, text);
-      for (const item of found) byUrl.set(item.url, item);
+      // Both query pages can list the same job. Keep the copy that has a date: its title came
+      // from the page text, while a copy without one may only have the title rebuilt from the URL.
+      for (const item of found) {
+        const prev = byUrl.get(item.url);
+        if (!prev || (!prev.postedAt && item.postedAt)) byUrl.set(item.url, item);
+      }
       const jobLinks = links.filter((u) => /\/job\//.test(u)).length;
       seen.push(`${text.length} chars, ${links.length} links (${jobLinks} to jobs), ${found.length} jobs read`);
     }
