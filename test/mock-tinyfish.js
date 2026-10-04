@@ -91,7 +91,7 @@ const smartHooli = () => JSON.stringify({ offset: 0, limit: 100, totalFound: 2, 
 ] });
 
 const PAGES = {
-  'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern--C--_R123': '# Software Engineer Intern (C++)\nLocations\nNew York, NY\nWe will provide visa sponsorship for eligible candidates. Python, Java.',
+  'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern--C--_R123': '# Software Engineer Intern (C++)\n**remote type**:   Remote\nLocations\nNew York, NY\nWe will provide visa sponsorship for eligible candidates. Python, Java.',
   'https://jobs.ashbyhq.com/piedpiper/p1': '# Software Engineer Intern (Compression)\nRemote (US)\nMiddle-out compression in Python. Are you authorized to work in the US without sponsorship? We support students on OPT and CPT.',
   'https://jobs.smartrecruiters.com/Hooli/7441': '# Software Engineer Intern\nHooli, New York\nWork on search. Visa sponsorship is available for this role. Python a plus.',
   'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern_R123': '# Software Engineer Intern\nLocations\nNew York, NY\nPosted 3 Days Ago\nWe will provide visa sponsorship for eligible candidates. Python, Java.',

@@ -221,6 +221,17 @@ test('takes real titles from posting pages, never generic ones', () => {
   assert.equal(realTitle({ title: real }, '', slug), real);
   assert.equal(realTitle({ title: 'Careers' }, `Skip\n## ${real}\nApply`, slug), real);
   assert.equal(realTitle({ title: 'Careers' }, '## Capital Program Manager', slug), null);
+  // Live Cisco page: Fetch's title field still held an HTML entity.
+  assert.equal(
+    realTitle({ title: 'Sr Software Engineer--Routing Platform &amp; Infrastructure' }, '', 'Sr Software Engineer Routing Platform Infrastructure'),
+    'Sr Software Engineer--Routing Platform & Infrastructure');
+});
+
+test('reads the work style from Workday posting pages', () => {
+  const { workdayRemoteType } = require('../src/read');
+  const page = '## Sr Software Engineer\n\nApply\n\n**remote type**:   Hybrid\n\n**locations**:   Milpitas, California, US';
+  assert.equal(workdayRemoteType(page), 'Hybrid');
+  assert.equal(workdayRemoteType('no such field'), null);
 });
 
 test('dedupes Workday jobs by job ID across URL forms', () => {

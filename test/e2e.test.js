@@ -188,6 +188,7 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.equal(um[0].title, 'Software Engineer Intern (C++)', 'real title from the posting page');
     assert.equal(um[0].location, 'New York, NY', 'location from the job block, not the URL');
     assert.ok(um[0].daysOld <= 2, 'posted date from the job block');
+    assert.equal(um[0].remote, true, 'remote type read from the posting page');
     assert.equal(r9.usage.agent.runs, 2);
   });
 

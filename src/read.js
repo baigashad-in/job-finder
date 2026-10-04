@@ -6,7 +6,7 @@
 //             postings found by Search), Fetch the posting page itself. The text is
 //             what visa detection, keyword matching and "job closed" checks read.
 
-const { PARSERS, parseJsonText, parseJsonFromHtml, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, prettyName, clip, toIso } = require('./ats');
+const { PARSERS, parseJsonText, parseJsonFromHtml, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, prettyName, decodeEntities, clip, toIso } = require('./ats');
 const { pool, plural } = require('./util');
 const { cleanSearchTitle } = require('./discover');
 
@@ -144,12 +144,19 @@ function realTitle(r, text, urlTitle) {
   const words = String(urlTitle).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   const headings = (String(text).match(/^#{1,3}\s+.+$/gm) || []).slice(0, 3).map((h) => h.replace(/^#+\s+/, ''));
   for (const c of [r.title, ...headings]) {
-    const t = cleanSearchTitle(String(c || '').replace(/[*_`]/g, '')).trim();
+    // Fetch's title field can still hold HTML entities ("Platform &amp; Infrastructure").
+    const t = cleanSearchTitle(decodeEntities(String(c || '')).replace(/[*_`]/g, '')).trim();
     if (!t || GENERIC_TITLE.test(t)) continue;
     const have = new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
     if (words.length && words.filter((w) => have.has(w)).length / words.length >= 0.6) return t;
   }
   return null;
+}
+
+// Workday posting pages state the work style: "**remote type**:   Hybrid".
+function workdayRemoteType(text) {
+  const m = String(text || '').match(/\*\*remote type\*\*\s*:?\s*([^\n*]{2,40})/i);
+  return m ? m[1].trim() : null;
 }
 
 const CLOSED = /(no longer (available|accepting|open)|position has been filled|this job (is|has been) closed|job (posting )?(has )?expired|page you are looking for (doesn't|does not) exist|job not found)/i;
@@ -181,13 +188,18 @@ async function enrich(listings, p, tf, log, limit, force) {
     const text = typeof r.text === 'string' ? r.text : '';
     if (!fromFeed && CLOSED.test(text.slice(0, 3000))) { l.closed = true; closed++; continue; }
     l.description = clip(text);
-    if (!l.title || l.title.length < 4) l.title = r.title || l.title;
+    if (!l.title || l.title.length < 4) l.title = r.title ? decodeEntities(r.title) : l.title;
     else if (l.titleFromUrl) {
       const t = realTitle(r, text, l.title);
       if (t) { l.title = t; l.titleFromUrl = false; }
     }
     if (!l.postedAt && r.published_date) l.postedAt = toIso(r.published_date);
     if (!l.location) l.location = guessLocation(text);
+    const remoteType = workdayRemoteType(text);
+    if (remoteType && !l.workplace) {
+      l.workplace = remoteType.toLowerCase();
+      if (/remote/i.test(remoteType)) l.remote = true;
+    }
     if (r.final_url && r.final_url !== l.url && !l.applyUrl) l.applyUrl = r.final_url;
     l.sources = [...new Set([...(l.sources || []), 'fetch:page'])];
   }
@@ -243,4 +255,4 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
   return { listings, report, needAgent };
 }
 
-module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, realTitle, CLOSED };
+module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, realTitle, workdayRemoteType, CLOSED };
