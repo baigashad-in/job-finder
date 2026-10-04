@@ -93,7 +93,12 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const toRead = needText.slice(0, ENRICH_LIMIT);
   for (const l of needText.slice(ENRICH_LIMIT)) if (l.titleFromUrl && toRead.length < ENRICH_LIMIT + 20) toRead.push(l);
   const enr = await enrich(toRead, p, tf, log, toRead.length, force);
-  if (enr.closed) log('fetch', `${plural(enr.closed, 'posting')} closed, removed`);
+  if (enr.closed) {
+    log('fetch', `${plural(enr.closed, 'posting')} closed, removed`);
+    // Say which and why, so a wrong removal can be checked with debug-fetch.js.
+    const shown = enr.closedList.slice(0, 3).map((c) => `${c.company} "${c.title}" (${c.why}: ${c.url})`).join('; ');
+    warnings.push(`Removed ${plural(enr.closed, 'closed posting')}: ${shown}${enr.closed > 3 ? '; and more' : ''}.`);
+  }
 
   // 6. Rank
   const drops = {};

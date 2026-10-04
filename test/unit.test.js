@@ -254,6 +254,43 @@ test('reads JSON from an HTML Fetch result', () => {
   assert.equal(parseJsonFromHtml('<html><body>Access denied</body></html>'), null);
 });
 
+test('jobs seen live are not removed because their page cannot be read', async () => {
+  const { enrich } = require('../src/read');
+  // A live run removed every Agent-found Ashby job after reading its page failed.
+  const pages = {
+    'https://jobs.ashbyhq.com/acme/a1': { error: 'page_not_found' },
+    'https://jobs.ashbyhq.com/acme/a2': { text: 'Sorry, this job is no longer available.' },
+    'https://jobs.ashbyhq.com/acme/a3': { text: 'Job not found' },
+    'https://example.com/jobs/s1': { error: 'page_not_found' },
+    'https://example.com/jobs/s2': { text: 'The page you are looking for does not exist.' },
+  };
+  const tf = { fetchUrls: async (urls) => ({
+    results: urls.filter((u) => pages[u].text).map((u) => ({ url: u, text: pages[u].text, title: null })),
+    errors: urls.filter((u) => pages[u].error).map((u) => ({ url: u, error: pages[u].error })),
+  }) };
+  const mk = (url, sources) => ({ title: 'SWE Intern', company: 'Acme', url, sources, description: '' });
+  const ls = [
+    mk('https://jobs.ashbyhq.com/acme/a1', ['agent:ashby']),
+    mk('https://jobs.ashbyhq.com/acme/a2', ['agent:ashby']),
+    mk('https://jobs.ashbyhq.com/acme/a3', ['agent:ashby']),
+    mk('https://example.com/jobs/s1', ['search']),
+    mk('https://example.com/jobs/s2', ['search']),
+  ];
+  const out = await enrich(ls, normalizePrefs({ role: 'software engineer' }), tf, () => {}, 10, false);
+  assert.deepEqual(ls.map((l) => !!l.closed), [false, true, false, true, true]);
+  assert.equal(out.closed, 3);
+  assert.equal(out.closedList[0].url, 'https://jobs.ashbyhq.com/acme/a2');
+  assert.match(out.closedList[0].why, /closed/);
+});
+
+test('cleans board-style company names', () => {
+  assert.equal(prettyName('shopback-2'), 'Shopback');
+  assert.equal(prettyName('g2'), 'G2');
+  const { PARSERS } = require('../src/ats');
+  const jobs = PARSERS.greenhouse({ jobs: [{ title: 'SWE', absolute_url: 'https://x.y/1', company_name: 'Rubrik Job Board', location: { name: 'X' } }] }, { token: 'rubrik' });
+  assert.equal(jobs[0].company, 'Rubrik');
+});
+
 test('prefs are validated and capped', () => {
   assert.throws(() => normalizePrefs({ role: '' }), /Add a role/);
   const p = normalizePrefs({ role: 'x', maxAgentRuns: 99, postedWithinDays: -5, seniority: 'wizard', locations: 'Remote' });

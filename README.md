@@ -156,7 +156,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 
 * **New since last run.** The app remembers which jobs each search has shown. On later runs, jobs it has not seen before get a **New** label and a **New only** filter.
 * **Saved searches** keep your preferences and last results. Start the server with `REFRESH_HOURS=24` to re-run every saved search on a schedule.
-* **Closed postings** found while reading pages are removed.
+* **Closed postings** are removed when their page says so ("no longer available", "position has been filled"). A job that a feed or the Agent just read from the live board is never removed only because its page could not be read. Removed jobs are listed with the reason and link.
 
 ## Tests
 
@@ -164,7 +164,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-48 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+50 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 

@@ -125,7 +125,7 @@ function htmlToText(html) {
 }
 
 function prettyName(token) {
-  const t = String(token || '');
+  const t = String(token || '').replace(/[-_]\d+$/, ''); // shopback-2 -> shopback
   if (/^[a-z0-9]{2,3}$/i.test(t)) return t.toUpperCase(); // cba -> CBA, ptc -> PTC
   return t
     .split(/[-_\s]+/)
@@ -197,7 +197,8 @@ function parseGreenhouse(json, board) {
     const offices = (j.offices || []).map((o) => o.location || o.name).filter(Boolean);
     return {
       title: j.title,
-      company: String(j.company_name || board.company || prettyName(board.token)).trim(),
+      // Some companies set their board name as company name: "Rubrik Job Board".
+      company: String(j.company_name || board.company || prettyName(board.token)).trim().replace(/\s+(job board|careers|jobs)$/i, ''),
       location: loc,
       locations: [loc, ...offices].filter(Boolean),
       remote: null,

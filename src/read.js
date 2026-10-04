@@ -159,7 +159,11 @@ function workdayRemoteType(text) {
   return m ? m[1].trim() : null;
 }
 
-const CLOSED = /(no longer (available|accepting|open)|position has been filled|this job (is|has been) closed|job (posting )?(has )?expired|page you are looking for (doesn't|does not) exist|job not found)/i;
+// An explicit message about the job is trusted for any job not from a live feed. A generic
+// "not found" page is only trusted for jobs found by Search alone: for jobs the Agent just
+// read from the live board, it usually means Fetch could not render the page.
+const JOB_CLOSED = /(no longer (available|accepting|open)|position has been filled|this job (is|has been) closed|job (posting )?(has )?expired)/i;
+const NOT_FOUND = /(page you are looking for (doesn't|does not) exist|job not found|page not found)/i;
 
 function guessLocation(text) {
   const m = String(text || '').match(/(?:^|\n)\s*(?:\*\*)?(?:locations?|job location|office location|work location)(?:\*\*)?\s*[:\n]\s*([^\n]{2,80})/i);
@@ -169,7 +173,7 @@ function guessLocation(text) {
 // Mutates listings in place. Returns how many it read and how many were closed.
 async function enrich(listings, p, tf, log, limit, force) {
   const todo = listings.slice(0, limit);
-  if (!todo.length) return { read: 0, closed: 0 };
+  if (!todo.length) return { read: 0, closed: 0, closedList: [] };
   log('step', `Reading ${plural(todo.length, 'posting page')} with TinyFish Fetch to check visa notes and details`);
   const res = byRequestedUrl(await fetchChunks(tf, todo.map((l) => l.url), {
     ttl: force ? 0 : 21600,
@@ -177,16 +181,26 @@ async function enrich(listings, p, tf, log, limit, force) {
     purpose: `Read job postings for ${p.role} roles to find location, posting date and visa sponsorship policy`,
   }));
   let closed = 0;
+  const closedList = [];
+  const markClosed = (l, why) => {
+    l.closed = true;
+    closed++;
+    closedList.push({ company: l.company, title: l.title, url: l.url, why });
+  };
   for (const l of todo) {
     const r = res.ok.get(l.url);
     const e = res.err.get(l.url);
-    // A live ATS feed is the authority on whether a job is open. Only trust
-    // "closed" signals for jobs found by Search or Agent.
+    // A live feed is the authority on whether a job is open. A job the Agent just read from
+    // the live board is open too: a failed page read says nothing about it (Ashby posting
+    // pages are JavaScript apps that Fetch often cannot render).
     const fromFeed = (l.sources || []).some((s) => s.startsWith('fetch:') && s !== 'fetch:page');
-    if (e && e.error === 'page_not_found' && !fromFeed) { l.closed = true; closed++; continue; }
+    const seenLive = fromFeed || (l.sources || []).some((s) => s.startsWith('agent:'));
+    if (e && e.error === 'page_not_found' && !seenLive) { markClosed(l, 'page not found'); continue; }
     if (!r) continue;
     const text = typeof r.text === 'string' ? r.text : '';
-    if (!fromFeed && CLOSED.test(text.slice(0, 3000))) { l.closed = true; closed++; continue; }
+    const head = text.slice(0, 3000);
+    if (!fromFeed && JOB_CLOSED.test(head)) { markClosed(l, 'page says the job is closed'); continue; }
+    if (!seenLive && NOT_FOUND.test(head)) { markClosed(l, 'page not found'); continue; }
     l.description = clip(text);
     if (!l.title || l.title.length < 4) l.title = r.title ? decodeEntities(r.title) : l.title;
     else if (l.titleFromUrl) {
@@ -203,7 +217,7 @@ async function enrich(listings, p, tf, log, limit, force) {
     if (r.final_url && r.final_url !== l.url && !l.applyUrl) l.applyUrl = r.final_url;
     l.sources = [...new Set([...(l.sources || []), 'fetch:page'])];
   }
-  return { read: todo.length, closed };
+  return { read: todo.length, closed, closedList };
 }
 
 // Workday careers sites have no public GET feed, but Fetch renders their search results
@@ -255,4 +269,4 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
   return { listings, report, needAgent };
 }
 
-module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, realTitle, workdayRemoteType, CLOSED };
+module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, realTitle, workdayRemoteType, JOB_CLOSED, NOT_FOUND };
