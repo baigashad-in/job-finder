@@ -27,6 +27,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const p = normalizePrefs(rawPrefs);
   const searchId = store.searchIdFor(p);
   const warnings = [];
+  if (p.countryFrom) log('step', `Searching in country ${p.country} because your first location is ${p.countryFrom}`);
   // Server-wide ceiling on Agent runs, for public deploys where visitors spend your credits.
   const limit = Number.parseInt(process.env.AGENT_RUNS_LIMIT, 10);
   if (Number.isFinite(limit) && limit >= 0 && p.maxAgentRuns > limit) {

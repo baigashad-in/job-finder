@@ -346,8 +346,26 @@ function workdayJobsFromMarkdown(markdown, target) {
   return out;
 }
 
+// Fallback when the page text has no usable link markup: build jobs from the links list
+// Fetch returns with links: true. The title comes from the URL slug:
+// /job/Bangalore-India/Software-Engineer--Java-_R123 -> "Software Engineer Java".
+function workdayJobsFromLinks(urls, target) {
+  const md = (urls || []).map((u) => {
+    try {
+      const x = new URL(u, target.boardUrl || target.url);
+      const parts = x.pathname.split('/').filter(Boolean);
+      const j = parts.indexOf('job');
+      if (j < 0 || parts.length < j + 3) return '';
+      const slug = decodeURIComponent(parts[parts.length - 1]).replace(/_[A-Za-z0-9-]+$/, '');
+      const title = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return title.length >= 3 ? `[${title}](${x.href})` : '';
+    } catch { return ''; }
+  }).filter(Boolean).join('\n');
+  return workdayJobsFromMarkdown(md, target);
+}
+
 module.exports = {
   FEED_DOMAINS, AGENT_DOMAINS, ATS_DOMAINS, PARSERS,
   detectAts, htmlToText, decodeEntities, prettyName, companyFromTitle, parseJsonText,
-  jobLinksFromMarkdown, workdayJobsFromMarkdown, toIso, clip, safeUrl,
+  jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, toIso, clip, safeUrl,
 };

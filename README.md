@@ -85,6 +85,12 @@ node cli.js --role "data analyst" --level entry --locations "Chicago; Remote" \
 
 Tests (no network or credits needed): `npm test`
 
+See what Fetch returns for one page (useful when a site reads 0 jobs):
+
+```bash
+node --env-file=.env debug-fetch.js "https://company.wd5.myworkdayjobs.com/en-US/Site" "software engineer"
+```
+
 ## Architecture
 
 ```
@@ -122,11 +128,11 @@ Before you make it public:
 
 ## What each TinyFish API does here
 
-**Search (free)** turns your preferences into 2 to 4 queries restricted with `include_domains` to the job systems most companies use. The first query uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
+**Search (free)** asks each job system separately (Greenhouse, Lever, Ashby, Workday, then SmartRecruiters and Workable), using `include_domains`, because one combined query returns only 10 results and one system can crowd out the rest. The search country follows the first city you type (Bangalore searches India), since a city is more specific than the country dropdown. An extra query across all systems uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
 
-**Fetch (free)** reads the public JSON feed that Greenhouse, Lever, Ashby and SmartRecruiters publish for each company: every open job with title, location, date and usually the full description. It also confirms a watchlist company's board by trying its likely feed URLs, falls back to the human board page if a feed cannot be parsed, reads Workday search results pages (`?q=software engineer`, plus a second query with your city), and reads the posting pages of top matches that have no description yet. That page text drives visa detection, keyword matching and removal of closed postings. Normal runs accept a cache entry up to 1 hour old (`ttl: 3600`); **Skip caches** sends `ttl: 0`.
+**Fetch (free)** reads the public JSON feed that Greenhouse, Lever, Ashby and SmartRecruiters publish for each company: every open job with title, location, date and usually the full description. It also confirms a watchlist company's board by trying its likely feed URLs, falls back to the human board page if a feed cannot be parsed, reads Workday search results pages (`?q=software engineer`, plus a second query with your city, taking job links from the page text or from Fetch's separate links list), and reads the posting pages of top matches that have no description yet. That page text drives visa detection, keyword matching and removal of closed postings. Normal runs accept a cache entry up to 1 hour old (`ttl: 3600`); **Skip caches** sends `ttl: 0`.
 
-**Agent (uses credits)** handles sites that need a real browser to type into a search box: custom careers pages, Workable, and Workday sites whose search page Fetch could not read. It returns structured JSON through `output_schema`. While it runs, the progress log shows a **Watch live** link to the Agent's browser. Spending is controlled: runs are capped per search (your watchlist first) and run two at a time, results are cached for 12 hours, a run is cancelled if it takes longer than 200 seconds once started or waits too long in the queue, and it is retried once in `stealth` mode with a proxy only if the site explicitly blocked it. Only `http` and `https` links from Agent results are kept.
+**Agent (uses credits)** handles sites that need a real browser to type into a search box: custom careers pages, Workable, and Workday sites whose search page Fetch could not read. It returns structured JSON through `output_schema`. While it runs, the progress log shows a **Watch live** link to the Agent's browser. On Workday sites the Agent starts on the results page already filtered by your role and only reads the list. Spending is controlled: runs are capped per search (your watchlist first) and run two at a time, the app stops starting new runs after two fail with none succeeding, results are cached for 12 hours, a run is cancelled if it takes longer than 200 seconds once started or waits too long in the queue, and it is retried once in `stealth` mode with a proxy only if the site explicitly blocked it. Only `http` and `https` links from Agent results are kept.
 
 ## How matching works
 
@@ -155,7 +161,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-34 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+39 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 
@@ -166,12 +172,14 @@ The end-to-end test checks that a full run uses all three APIs, returns exactly 
 * **Level and role come from titles.** Unusual titles ("Member of Technical Staff", "Software Engineer, University Grad") are covered, but some will be missed or misread.
 * **Agent results vary by site.** Some careers sites block automated browsers even in stealth mode. Failures are listed under the results, not hidden.
 * **Posted dates differ by system.** Greenhouse gives the first publish date, Lever the creation date, Ashby the publish date. Some Agent results have no date.
+* **Some Workday pages show no job links to Fetch,** probably because the page renders before its job list loads. The log line for each Workday site shows what Fetch saw; those sites then go to the Agent.
 * **Workday through Fetch reads the first results page only** (about 20 jobs per query, two queries per site) and the main location of each job. Jobs listed in several cities count only their first city.
 
 ## Files
 
 * `server.js`: web server, background search tasks, saved searches, scheduled refresh
 * `cli.js`: command line version
+* `debug-fetch.js`: shows what Fetch returns for one URL
 * `public/index.html`: the whole UI, plain HTML, CSS and JavaScript
 * `src/tinyfish.js`: Search, Fetch and Agent client with retries, timeouts and usage counts
 * `src/discover.js`: step 1, Search queries and watchlist lookup

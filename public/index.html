@@ -401,7 +401,7 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
   function usageText(u) {
     const parts = [
       `Search: ${plural(u.search.calls, 'query')}`,
-      `Fetch: ${plural(u.fetch.calls, 'call')} reading ${plural(u.fetch.urls, 'URL')}`,
+      `Fetch: ${plural(u.fetch.calls, 'call')} reading ${plural(u.fetch.urls, 'URL')}${u.fetch.failed ? `, ${u.fetch.failed} failed` : ''}`,
       `Agent: ${plural(u.agent.runs, 'run')}${u.agent.cached ? `, ${u.agent.cached} from cache` : ''}`,
     ];
     return `TinyFish usage. ${parts.join('. ')}.`;

@@ -6,7 +6,7 @@
 //             postings found by Search), Fetch the posting page itself. The text is
 //             what visa detection, keyword matching and "job closed" checks read.
 
-const { PARSERS, parseJsonText, jobLinksFromMarkdown, workdayJobsFromMarkdown, clip, toIso } = require('./ats');
+const { PARSERS, parseJsonText, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, clip, toIso } = require('./ats');
 const { pool, plural } = require('./util');
 
 function byRequestedUrl(res) {
@@ -136,7 +136,8 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
   for (const t of targets) for (const q of queries) reqs.push({ t, url: `${t.boardUrl}?q=${encodeURIComponent(q)}` });
   const res = byRequestedUrl(await fetchChunks(tf, reqs.map((r) => r.url), {
     ttl: force ? 0 : 3600,
-    perUrlTimeoutMs: 60000,
+    links: true, // second source of job links if the page text has none
+    perUrlTimeoutMs: 90000,
     purpose: `Read job search results on each company's Workday careers site for ${p.role} roles`,
   }));
   const listings = [];
@@ -145,12 +146,21 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
   for (const t of targets) {
     const byUrl = new Map();
     let zero = false;
+    const seen = []; // what Fetch returned, logged so a failure can be diagnosed
     for (const r of reqs.filter((x) => x.t === t)) {
       const page = res.ok.get(r.url);
-      const text = page && typeof page.text === 'string' ? page.text : '';
+      const err = res.err.get(r.url);
+      if (!page) { seen.push(err ? `error ${err.error}` : 'no result'); continue; }
+      const text = typeof page.text === 'string' ? page.text : '';
+      const links = Array.isArray(page.links) ? page.links : [];
       if (/\b0\s+jobs?\s+found\b/i.test(text)) zero = true;
-      for (const item of workdayJobsFromMarkdown(text, t)) byUrl.set(item.url, item);
+      let found = workdayJobsFromMarkdown(text, t);
+      if (!found.length && links.length) found = workdayJobsFromLinks(links, t);
+      for (const item of found) byUrl.set(item.url, item);
+      const jobLinks = links.filter((u) => /\/job\//.test(u)).length;
+      seen.push(`${text.length} chars, ${links.length} links (${jobLinks} to jobs), ${found.length} jobs read`);
     }
+    log('fetch', `${t.company} Workday page: ${seen.join(' | ')}`);
     const items = [...byUrl.values()];
     items.forEach((x) => { x.sources = ['fetch:workday']; });
     listings.push(...items);

@@ -57,6 +57,20 @@ function buildGoal(p) {
   ].join('\n');
 }
 
+// Workday runs start on the results page already filtered by ?q=role, so the Agent
+// only has to read the list. Typing and filters were what made runs hit the time limit.
+function buildWorkdayGoal() {
+  return [
+    'Goal: read the job search results already shown on this page. Work quickly.',
+    'Steps:',
+    '1. Close any cookie or privacy banner.',
+    '2. Wait for the list of jobs to appear. Do not type in the search box, do not use filters, and do not open postings.',
+    `3. Read the first page of results, up to ${MAX_JOBS} postings.`,
+    'Return: the company name, and for each posting its title, location as shown (or null), posted date text as shown (or null), department if shown (or null), and url, the full absolute link to the posting.',
+    'Rules: copy text exactly as shown. Do not invent postings or links. If the page says no jobs were found, return an empty jobs list. If you hit a captcha, a login wall or an access denied page, stop and set blocked to true.',
+  ].join('\n');
+}
+
 function findJobsArray(obj, depth = 0) {
   if (!obj || typeof obj !== 'object' || depth > 4) return null;
   if (Array.isArray(obj)) return obj.length && obj[0] && typeof obj[0] === 'object' && 'title' in obj[0] ? obj : null;
@@ -127,8 +141,14 @@ function runBody(target, goal, stealth, country) {
 
 async function runAgents(targets, p, tf, log, warnings, force, store) {
   const report = [];
-  const goal = buildGoal(p);
-  const lists = await pool(targets, 2, async (t) => {
+  const searchText = [LEVEL_WORDS[p.seniority] || '', p.role].filter(Boolean).join(' ');
+  let failures = 0;
+  let successes = 0;
+  let skipped = 0;
+  const lists = await pool(targets, 2, async (target) => {
+    const isWorkday = target.ats === 'workday' && target.boardUrl;
+    const t = isWorkday ? { ...target, url: `${target.boardUrl}?q=${encodeURIComponent(searchText)}` } : target;
+    const goal = isWorkday ? buildWorkdayGoal() : buildGoal(p);
     const host = (safeUrl(t.url) || {}).hostname || t.url;
     const cacheKey = store.hash(`${t.url}|${goal}`);
     if (!force) {
@@ -139,6 +159,13 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
         report.push({ company: t.company, url: t.url, ats: t.ats, status: 'cached', jobs: cached.jobs.length });
         return toListings(cached, t);
       }
+    }
+    // Two failures and no success usually means this kind of site does not work today.
+    // Stop starting new runs instead of spending credits on the rest.
+    if (failures >= 2 && successes === 0) {
+      skipped++;
+      report.push({ company: t.company, url: t.url, ats: t.ats, status: 'skipped', jobs: 0 });
+      return [];
     }
     log('agent', `${t.company}: Agent is browsing ${host}`);
     let run;
@@ -157,22 +184,28 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
         parsed = parseAgentResult(run);
       }
     } catch (err) {
+      failures++;
       warnings.push(`Agent could not read ${t.company} (${host}): ${err.message}`);
       report.push({ company: t.company, url: t.url, ats: t.ats, status: 'error', jobs: 0 });
       return [];
     }
     if (run.status !== 'COMPLETED' || parsed.blocked) {
+      failures++;
       const why = parsed.blocked ? 'site blocked the browser' : (run.error && (run.error.message || run.error.code)) || run.status;
       warnings.push(`Agent could not read ${t.company} (${host}): ${why}`);
       report.push({ company: t.company, url: t.url, ats: t.ats, status: 'failed', jobs: 0 });
       return [];
     }
+    successes++;
     store.setAgentCache(cacheKey, parsed);
     log('agent', `${t.company}: Agent returned ${plural(parsed.jobs.length, 'posting')} in ${run.num_of_steps || '?'} steps`);
     report.push({ company: t.company, url: t.url, ats: t.ats, status: 'done', jobs: parsed.jobs.length, steps: run.num_of_steps || null });
     return toListings(parsed, t);
   });
+  if (skipped) {
+    warnings.push(`${failures} Agent runs failed and none succeeded, so the app skipped ${plural(skipped, 'careers site')} to save credits.`);
+  }
   return { listings: lists.flat(), agentReport: report };
 }
 
-module.exports = { runAgents, buildGoal, parseAgentResult, toListings, OUTPUT_SCHEMA };
+module.exports = { runAgents, buildGoal, buildWorkdayGoal, parseAgentResult, toListings, OUTPUT_SCHEMA };

@@ -13,18 +13,26 @@ const AGGREGATORS = ['linkedin.com', 'indeed.com', 'glassdoor.com', 'ziprecruite
   'builtin.com', 'wellfound.com', 'joinhandshake.com', 'levels.fyi', 'reddit.com', 'youtube.com', 'facebook.com',
   'twitter.com', 'x.com', 'instagram.com', 'wikipedia.org', 'crunchbase.com'];
 
+// Search returns at most 10 results per query. One combined query lets a single job
+// system (often Workday) crowd out boards with free, complete feeds, so ask each one.
+const DOMAIN_GROUPS = [
+  { name: 'Greenhouse', domains: ['boards.greenhouse.io', 'job-boards.greenhouse.io'] },
+  { name: 'Lever', domains: ['jobs.lever.co'] },
+  { name: 'Ashby', domains: ['jobs.ashbyhq.com'] },
+  { name: 'Workday', domains: ['myworkdayjobs.com'] },
+  { name: 'SmartRecruiters and Workable', domains: ['jobs.smartrecruiters.com', 'apply.workable.com'] },
+];
+
 function buildQueries(p) {
   const lvl = LEVEL_WORDS[p.seniority] || '';
   const place = p.places[0] || (p.remoteOk ? 'remote' : '');
   const base = [p.role, lvl, place].filter(Boolean).join(' ');
-  const q = [
-    { label: 'recent postings', query: base, recency_minutes: (p.postedWithinDays || 30) * 1440 },
-    { label: 'all postings', query: `${base} jobs` },
-  ];
-  if (p.keywords.length) q.push({ label: 'with keywords', query: [p.role, lvl, ...p.keywords.slice(0, 2)].filter(Boolean).join(' ') });
-  if (p.places[1]) q.push({ label: 'second location', query: [p.role, lvl, p.places[1]].filter(Boolean).join(' ') });
-  if (p.remoteOk && p.places.length) q.push({ label: 'remote', query: [p.role, lvl, 'remote'].filter(Boolean).join(' ') });
-  return q.slice(0, 4);
+  const q = DOMAIN_GROUPS.map((g) => ({ label: g.name, query: base, domains: g.domains }));
+  q.push({ label: 'recent, all systems', query: base, domains: ATS_DOMAINS, recency_minutes: (p.postedWithinDays || 30) * 1440 });
+  if (p.keywords.length) q.push({ label: 'with keywords', query: [p.role, lvl, ...p.keywords.slice(0, 2)].filter(Boolean).join(' '), domains: ATS_DOMAINS });
+  if (p.places[1]) q.push({ label: 'second location', query: [p.role, lvl, p.places[1]].filter(Boolean).join(' '), domains: ATS_DOMAINS });
+  if (p.remoteOk && p.places.length) q.push({ label: 'remote', query: [p.role, lvl, 'remote'].filter(Boolean).join(' '), domains: ATS_DOMAINS });
+  return q.slice(0, 8);
 }
 
 function cleanSearchTitle(t) {
@@ -168,18 +176,18 @@ async function discover(p, tf, log, warnings) {
   if (p.discover) {
     const queries = buildQueries(p);
     log('step', `Searching job boards with ${plural(queries.length, 'TinyFish Search query')}`);
-    await pool(queries, 2, async (q) => {
+    await pool(queries, 3, async (q) => {
       try {
         const results = await tf.search({
           query: q.query,
-          include_domains: ATS_DOMAINS,
+          include_domains: q.domains,
           location: p.country,
           recency_minutes: q.recency_minutes,
           purpose: `Find open ${p.role} job postings on company job boards`,
         });
         let added = 0;
         for (const r of results) if (addHit(acc, r, 'search')) added++;
-        log('search', `"${q.query}" (${q.label}): ${plural(results.length, 'hit')}, ${plural(added, 'new board')}`);
+        log('search', `"${q.query}" on ${q.label}: ${plural(results.length, 'hit')}, ${plural(added, 'new board')}`);
       } catch (err) {
         warnings.push(`Search "${q.query}" failed: ${err.message}`);
       }
@@ -188,4 +196,4 @@ async function discover(p, tf, log, warnings) {
   return acc;
 }
 
-module.exports = { discover, buildQueries, cleanSearchTitle, tokenMatches, AGGREGATORS };
+module.exports = { discover, buildQueries, cleanSearchTitle, tokenMatches, AGGREGATORS, DOMAIN_GROUPS };

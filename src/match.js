@@ -376,6 +376,17 @@ function dedupe(listings) {
   };
 }
 
+// The country of the first location the user typed ("Bangalore" -> IN), or null.
+function inferCountry(places) {
+  for (const place of places) {
+    const code = COUNTRY_INPUT[norm(place)];
+    if (code) return code;
+    for (const c of Object.keys(COUNTRIES)) if (c !== 'US' && inCountry(place, c)) return c;
+    if (inCountry(place, 'US')) return 'US';
+  }
+  return null;
+}
+
 // ===== prefs =====
 const LEVELS = ['any', 'intern', 'entry', 'mid', 'senior', 'staff', 'manager'];
 function list(v, re, max, len = 80) {
@@ -389,7 +400,10 @@ function normalizePrefs(raw = {}) {
   const places = locations.filter((l) => !/^remote\b/i.test(l));
   const remoteOk = !!raw.remoteOk || locations.some((l) => /^remote\b/i.test(l));
   const visa = raw.visa === 'need' ? 'need' : 'any';
-  const country = /^[A-Z]{2}$/.test(String(raw.country || '').toUpperCase()) ? String(raw.country).toUpperCase() : 'US';
+  const chosen = /^[A-Z]{2}$/.test(String(raw.country || '').toUpperCase()) ? String(raw.country).toUpperCase() : 'US';
+  // A typed city is more specific than the country dropdown, so it wins.
+  const inferred = inferCountry(places);
+  const country = inferred || chosen;
   const days = Number.parseInt(raw.postedWithinDays, 10);
   const agents = Number.parseInt(raw.maxAgentRuns, 10);
   return {
@@ -400,6 +414,7 @@ function normalizePrefs(raw = {}) {
     places,
     remoteOk,
     country,
+    countryFrom: inferred && inferred !== chosen ? places[0] : null,
     visa,
     hideNoSponsor: visa === 'need' && raw.hideNoSponsor !== false,
     keywords: list(raw.keywords, /[,;\n]/, 10, 40),
@@ -413,5 +428,5 @@ function normalizePrefs(raw = {}) {
 
 module.exports = {
   normalizePrefs, evaluate, dedupe, canonicalUrl, detectLevel, detectVisa, scoreLocation,
-  isRemote, roleExpansions, LEVEL_LABEL, norm, toks,
+  isRemote, roleExpansions, inferCountry, LEVEL_LABEL, norm, toks,
 };
