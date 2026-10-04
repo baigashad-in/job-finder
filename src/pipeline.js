@@ -88,7 +88,11 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
     .filter(({ l, e }) => (!e.dropped || /^(visa|keywords)/.test(e.dropped)) && (!l.description || l.description.length < 40))
     .sort((a, b) => b.e.score - a.e.score)
     .map(({ l }) => l);
-  const enr = await enrich(needText, p, tf, log, ENRICH_LIMIT, force);
+  // Workday titles rebuilt from the URL lose punctuation, and the posting page has the
+  // real one, so read up to 20 more of those pages (Fetch is free).
+  const toRead = needText.slice(0, ENRICH_LIMIT);
+  for (const l of needText.slice(ENRICH_LIMIT)) if (l.titleFromUrl && toRead.length < ENRICH_LIMIT + 20) toRead.push(l);
+  const enr = await enrich(toRead, p, tf, log, toRead.length, force);
   if (enr.closed) log('fetch', `${plural(enr.closed, 'posting')} closed, removed`);
 
   // 6. Rank

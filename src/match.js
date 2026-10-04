@@ -352,7 +352,9 @@ function canonicalUrl(u) {
   // The ID after the last "_" (R12345, JR-001) is what identifies it.
   if (host.endsWith('.myworkdayjobs.com') && /\/(job|details)\//.test(path)) {
     const last = path.split('/').pop();
-    return `${host}/job/${(last.includes('_') ? last.split('_').pop() : last).toLowerCase()}`;
+    // "2025101-1" and "2025101" are the same job; only numeric IDs carry that suffix.
+    const id = (last.includes('_') ? last.split('_').pop() : last).toLowerCase().replace(/^(\d+)-\d+$/, '$1');
+    return `${host}/job/${id}`;
   }
   return `${host}${path.toLowerCase()}${gh ? `?gh_jid=${gh}` : ''}`;
 }

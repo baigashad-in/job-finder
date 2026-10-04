@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { detectAts, parseJsonText, htmlToText, companyFromTitle, workdayJobsFromMarkdown, prettyName } = require('../src/ats');
 const { parseAgentResult } = require('../src/agent');
 const { cleanSearchTitle, buildQueries } = require('../src/discover');
-const { workdayJobsFromLinks, workdayLocationFromUrl, parseJsonFromHtml } = require('../src/ats');
+const { workdayJobsFromLinks, workdayLocationFromUrl, parseJsonFromHtml, workdayBlocksFromText } = require('../src/ats');
 const { detectLevel, detectVisa, scoreLocation, normalizePrefs, dedupe, canonicalUrl, evaluate } = require('../src/match');
 const { parsePostedText } = require('../src/util');
 const { OUTPUT_SCHEMA } = require('../src/agent');
@@ -192,7 +192,41 @@ test('recovers real Workday titles and dates from page text', () => {
   assert.equal(workdayLocationFromUrl('https://visa.wd5.myworkdayjobs.com/en-US/V/job/IN-Bengaluru-India/X_R1'), 'IN Bengaluru India');
 });
 
+test('matches Workday links to page text by job ID (format from a live page)', () => {
+  const text = [
+    '18 JOBS FOUND',
+    '* **locations**:   Bangalore, India', '', '  **time type**:   Full time', '', '  **posted on**:   Posted 2 Days Ago', '', '  + 2025101',
+    '* ### Capital Program Manager', '', '  **locations**:   Bangalore, India', '', '  **posted on**:   Posted 5 Days Ago', '', '  + 2023058',
+    '* **locations**:   2 Locations', '', '  **posted on**:   Posted 30+ Days Ago', '', '  + 2021478',
+  ].join('\n');
+  assert.equal(workdayBlocksFromText(text).size, 3);
+  const base = 'https://cisco.wd5.myworkdayjobs.com/en-US/Cisco_Careers/job/Bangalore-India/';
+  const jobs = workdayJobsFromLinks([
+    `${base}Software-Engineer--Embedded-C--forwarding-protocols--4-10-years--Bangalore-_2025101-1?q=x`,
+    `${base}Capital-Program-Manager_2023058-1?q=x`,
+    `${base}Software-Engineer-II_2021478?q=x`,
+  ], { boardUrl: 'https://cisco.wd5.myworkdayjobs.com/en-US/Cisco_Careers', company: 'Cisco' }, text);
+  assert.equal(jobs[0].location, 'Bangalore, India');
+  assert.ok(jobs[0].postedAt, 'date found through ID 2025101 despite the -1 suffix');
+  assert.equal(jobs[0].titleFromUrl, true, 'no title on the page, so enrichment may replace it');
+  assert.equal(jobs[1].title, 'Capital Program Manager');
+  assert.equal(jobs[1].titleFromUrl, false);
+  assert.equal(jobs[2].location, 'Bangalore India (+1 more)', '"2 Locations" keeps the URL city');
+});
+
+test('takes real titles from posting pages, never generic ones', () => {
+  const { realTitle } = require('../src/read');
+  const slug = 'Software Engineer Embedded C forwarding protocols 4 10 years Bangalore';
+  const real = 'Software Engineer (Embedded C++, forwarding protocols) - 4-10 years - Bangalore';
+  assert.equal(realTitle({ title: real }, '', slug), real);
+  assert.equal(realTitle({ title: 'Careers' }, `Skip\n## ${real}\nApply`, slug), real);
+  assert.equal(realTitle({ title: 'Careers' }, '## Capital Program Manager', slug), null);
+});
+
 test('dedupes Workday jobs by job ID across URL forms', () => {
+  assert.equal(
+    canonicalUrl('https://cisco.wd5.myworkdayjobs.com/en-US/C/job/B/X_2025101-1?q=a'),
+    canonicalUrl('https://cisco.wd5.myworkdayjobs.com/C/job/B/Y_2025101'));
   assert.equal(
     canonicalUrl('https://cisco.wd5.myworkdayjobs.com/en-US/C/job/Bangalore-India/Software-Engineer_2001234'),
     canonicalUrl('https://cisco.wd5.myworkdayjobs.com/C/job/Bangalore/Software-Engineer-Java_2001234/apply'));

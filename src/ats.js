@@ -361,33 +361,90 @@ function workdayJobsFromMarkdown(markdown, target) {
 // Fallback when the page text has no usable link markup: build jobs from the links list
 // Fetch returns with links: true. The title comes from the URL slug:
 // /job/Bangalore-India/Software-Engineer--Java-_R123 -> "Software Engineer Java".
-// The URL slug loses punctuation ("C++" becomes "C"), so when the page text has a line
-// with the same words, use that line as the title and read the posted date below it.
+// Fetch's markdown of a Workday results page often drops the job title links but keeps,
+// for every job, its locations, posted date and job ID, like:
+//   * ### Capital Program Manager        (title only sometimes)
+//     **locations**:   Bangalore, India
+//     **posted on**:   Posted 5 Days Ago
+//     + 2023058
+// Map each job ID to those details.
+function workdayBlocksFromText(text) {
+  const map = new Map();
+  let cur = {};
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    let m;
+    if ((m = line.match(/^(?:[*+-]\s+)?#{1,6}\s+(.+)$/))) cur.title = m[1].replace(/[*_`]/g, '').trim();
+    else if ((m = line.match(/\*\*locations?\*\*\s*:?\s*(.+)$/i))) cur.location = m[1].replace(/[*_`]/g, '').trim();
+    else if ((m = line.match(/\*\*posted on\*\*\s*:?\s*(.+)$/i))) cur.posted = m[1].replace(/[*_`]/g, '').trim();
+    else if ((m = line.match(/^[+*-]\s+((?=[A-Za-z0-9_.-]*\d)[A-Za-z0-9][A-Za-z0-9_.-]{3,})$/))) {
+      map.set(m[1], cur);
+      cur = {};
+    }
+  }
+  return map;
+}
+
+// Builds Workday jobs from the links list Fetch returns with links: true.
+// Details come from the page text: first by job ID (most reliable), then by matching the
+// URL's words to a line of text. Without either, the title is rebuilt from the URL, which
+// loses punctuation ("C++" becomes "C"), and is marked so enrichment can replace it.
 function workdayJobsFromLinks(urls, target, text = '') {
+  const blocks = workdayBlocksFromText(text);
   const lines = String(text).split('\n').map((l) => l.replace(/[*_#`>|\[\]]/g, '').trim()).filter(Boolean);
   const keyOf = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const lineKeys = lines.map(keyOf);
   const used = new Set();
-  const md = (urls || []).map((u) => {
-    try {
-      const x = new URL(u, target.boardUrl || target.url);
-      const parts = x.pathname.split('/').filter(Boolean);
-      const j = parts.indexOf('job');
-      if (j < 0 || parts.length < j + 3) return '';
-      const slug = decodeURIComponent(parts[parts.length - 1]).replace(/_[A-Za-z0-9-]+$/, '');
-      let title = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
-      let below = '';
-      const k = keyOf(title);
+  const decode = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
+  const out = [];
+  const seen = new Set();
+  for (const u of urls || []) {
+    let x;
+    try { x = new URL(u, target.boardUrl || target.url); } catch { continue; }
+    if (!/^https?:$/.test(x.protocol) || !x.hostname.endsWith('.myworkdayjobs.com')) continue;
+    const parts = x.pathname.split('/').filter(Boolean);
+    const j = parts.indexOf('job');
+    if (j < 0 || parts.length < j + 3) continue;
+    const url = `${x.origin}${x.pathname}`;
+    if (seen.has(url.toLowerCase())) continue;
+    seen.add(url.toLowerCase());
+
+    const last = decode(parts[parts.length - 1]);
+    const id = last.includes('_') ? last.split('_').pop() : '';
+    const slugTitle = last.replace(/_[^_]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const slugLoc = decode(parts[j + 1]).replace(/[-_]+/g, ' ').trim();
+    // Text IDs can lack the URL's posting suffix: text "2025101", URL "2025101-1".
+    let block = id ? blocks.get(id) : null;
+    if (!block && id) for (const [k, v] of blocks) if (id.startsWith(`${k}-`)) { block = v; break; }
+
+    let title = block && block.title ? block.title : null;
+    let posted = block ? block.posted : null;
+    if (!title) {
+      const k = keyOf(slugTitle);
       const i = k.length >= 6 ? lineKeys.findIndex((lk, n) => !used.has(n) && (lk === k || (k.length >= 15 && lk.startsWith(k)))) : -1;
       if (i >= 0) {
         used.add(i);
         title = lines[i];
-        below = lines.slice(i + 1, i + 4).join('\n');
+        if (!posted) { const pm = lines.slice(i + 1, i + 4).join('\n').match(/posted[^\n|]{0,40}/i); posted = pm ? pm[0] : null; }
       }
-      return title.length >= 3 ? `[${title}](${x.href})\n${below}` : '';
-    } catch { return ''; }
-  }).filter(Boolean).join('\n');
-  return workdayJobsFromMarkdown(md, target);
+    }
+    let location = slugLoc;
+    if (block && block.location) {
+      const many = block.location.match(/^(\d+)\s+locations?$/i);
+      location = many ? `${slugLoc} (+${Number(many[1]) - 1} more)` : block.location;
+    }
+    if (!title && slugTitle.length < 3) continue;
+    out.push({
+      title: title || slugTitle,
+      titleFromUrl: !title,
+      company: target.company || prettyName(target.token),
+      location, locations: [location], remote: /\bremote\b/i.test(location) ? true : null, workplace: null,
+      postedAt: posted ? parsePostedText(posted) : null,
+      url, applyUrl: url, department: null, employmentType: null, salary: null,
+      description: '', levelHint: null, ats: 'workday',
+    });
+  }
+  return out;
 }
 
 // /en-US/Site/job/Bangalore-India/SWE_R1 -> "Bangalore India"
@@ -405,6 +462,6 @@ function workdayLocationFromUrl(u) {
 module.exports = {
   FEED_DOMAINS, AGENT_DOMAINS, ATS_DOMAINS, PARSERS,
   detectAts, htmlToText, decodeEntities, prettyName, companyFromTitle, parseJsonText,
-  jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, workdayLocationFromUrl,
+  jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, workdayBlocksFromText, workdayLocationFromUrl,
   parseJsonFromHtml, toIso, clip, safeUrl,
 };

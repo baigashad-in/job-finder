@@ -8,6 +8,7 @@
 
 const { PARSERS, parseJsonText, parseJsonFromHtml, jobLinksFromMarkdown, workdayJobsFromMarkdown, workdayJobsFromLinks, prettyName, clip, toIso } = require('./ats');
 const { pool, plural } = require('./util');
+const { cleanSearchTitle } = require('./discover');
 
 function byRequestedUrl(res) {
   const m = new Map();
@@ -135,6 +136,22 @@ async function readFeeds(boards, p, tf, log, warnings, force) {
   return { listings, boardReport: report, needAgent };
 }
 
+// A title rebuilt from a Workday URL loses punctuation. The posting page has the real one,
+// either as the page title or as an early heading. Only accept a candidate that contains most
+// of the URL's words, so a generic page title such as "Careers" never replaces a job title.
+const GENERIC_TITLE = /^(careers?|jobs?|job details|workday|search for jobs|home)$/i;
+function realTitle(r, text, urlTitle) {
+  const words = String(urlTitle).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const headings = (String(text).match(/^#{1,3}\s+.+$/gm) || []).slice(0, 3).map((h) => h.replace(/^#+\s+/, ''));
+  for (const c of [r.title, ...headings]) {
+    const t = cleanSearchTitle(String(c || '').replace(/[*_`]/g, '')).trim();
+    if (!t || GENERIC_TITLE.test(t)) continue;
+    const have = new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    if (words.length && words.filter((w) => have.has(w)).length / words.length >= 0.6) return t;
+  }
+  return null;
+}
+
 const CLOSED = /(no longer (available|accepting|open)|position has been filled|this job (is|has been) closed|job (posting )?(has )?expired|page you are looking for (doesn't|does not) exist|job not found)/i;
 
 function guessLocation(text) {
@@ -165,6 +182,10 @@ async function enrich(listings, p, tf, log, limit, force) {
     if (!fromFeed && CLOSED.test(text.slice(0, 3000))) { l.closed = true; closed++; continue; }
     l.description = clip(text);
     if (!l.title || l.title.length < 4) l.title = r.title || l.title;
+    else if (l.titleFromUrl) {
+      const t = realTitle(r, text, l.title);
+      if (t) { l.title = t; l.titleFromUrl = false; }
+    }
     if (!l.postedAt && r.published_date) l.postedAt = toIso(r.published_date);
     if (!l.location) l.location = guessLocation(text);
     if (r.final_url && r.final_url !== l.url && !l.applyUrl) l.applyUrl = r.final_url;
@@ -222,4 +243,4 @@ async function readWorkdayBoards(targets, p, tf, log, force) {
   return { listings, report, needAgent };
 }
 
-module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, CLOSED };
+module.exports = { readFeeds, readWorkdayBoards, enrich, guessLocation, realTitle, CLOSED };

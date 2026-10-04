@@ -23,7 +23,7 @@ function validateSchema(node, path = '#') {
 }
 
 function state() {
-  return { extraAcmeJob: false, workdayPage: false, workdayLinksOnly: false, pendingMs: 0, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
+  return { extraAcmeJob: false, workdayPage: false, workdayLinksOnly: false, workdayIdBlocks: false, pendingMs: 0, runDelayMs: 150, calls: { search: [], fetch: [], agentStart: [], agentPoll: 0, cancel: 0 }, runs: new Map(), umbrellaLiteRuns: 0 };
 }
 
 function greenhouseFeed(st) {
@@ -91,6 +91,7 @@ const smartHooli = () => JSON.stringify({ offset: 0, limit: 100, totalFound: 2, 
 ] });
 
 const PAGES = {
+  'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern--C--_R123': '# Software Engineer Intern (C++)\nLocations\nNew York, NY\nWe will provide visa sponsorship for eligible candidates. Python, Java.',
   'https://jobs.ashbyhq.com/piedpiper/p1': '# Software Engineer Intern (Compression)\nRemote (US)\nMiddle-out compression in Python. Are you authorized to work in the US without sponsorship? We support students on OPT and CPT.',
   'https://jobs.smartrecruiters.com/Hooli/7441': '# Software Engineer Intern\nHooli, New York\nWork on search. Visa sponsorship is available for this role. Python a plus.',
   'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern_R123': '# Software Engineer Intern\nLocations\nNew York, NY\nPosted 3 Days Ago\nWe will provide visa sponsorship for eligible candidates. Python, Java.',
@@ -107,6 +108,18 @@ function fetchOne(url, st, format) {
   if (url.startsWith('https://api.ashbyhq.com/posting-api/job-board/piedpiper')) return { text: ashbyAs(format, ashbyPiedPiperData(), false) };
   if (url.startsWith('https://api.smartrecruiters.com/v1/companies/Hooli/postings')) return { text: smartHooli() };
   if (PAGES[url]) return { text: PAGES[url], title: PAGES[url].split('\n')[0].replace('# ', '') };
+  if (st.workdayIdBlocks && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
+    // The real format seen on a live Workday page: most titles missing, but each job keeps
+    // its location, posted date and ID. Links carry the titles only in their URLs.
+    return { text: [
+      'Search for Jobs page is loaded', '2 JOBS FOUND',
+      '* **locations**:   New York, NY', '  **posted on**:   Posted 2 Days Ago', '  + R123',
+      '* ### Software Engineer Intern, Infrastructure', '  **locations**:   Austin, TX', '  **posted on**:   Posted Yesterday', '  + R124',
+    ].join('\n'), links: [
+      'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/New-York/Software-Engineer-Intern--C--_R123?q=x',
+      'https://umbrella.wd5.myworkdayjobs.com/en-US/External/job/Austin/Software-Engineer-Intern-Infra_R124?q=x',
+    ] };
+  }
   if (st.workdayLinksOnly && url.startsWith('https://umbrella.wd5.myworkdayjobs.com/en-US/External?q=')) {
     // Page text without link markup; job links only in the separate links list.
     return { text: 'Umbrella Careers\n2 JOBS FOUND\nSoftware Engineer Intern (C++)\nNew York, NY\nPosted 3 Days Ago', links: [

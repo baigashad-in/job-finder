@@ -179,6 +179,18 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.ok(um.sources.includes('fetch:workday'));
   });
 
+  mock.st.workdayIdBlocks = true;
+  const r9 = await runPipeline(PREFS, { tf: new TinyFish(), store, force: true });
+  mock.st.workdayIdBlocks = false;
+  await t.test('Workday jobs matched by ID get real dates and locations, and the posting page fixes the title', () => {
+    const um = r9.listings.filter((l) => l.company === 'Umbrella');
+    assert.equal(um.length, 1, 'Austin job filtered, Search copy merged by ID');
+    assert.equal(um[0].title, 'Software Engineer Intern (C++)', 'real title from the posting page');
+    assert.equal(um[0].location, 'New York, NY', 'location from the job block, not the URL');
+    assert.ok(um[0].daysOld <= 2, 'posted date from the job block');
+    assert.equal(r9.usage.agent.runs, 2);
+  });
+
   const r5 = await runPipeline({ ...PREFS, role: 'data analyst', seniority: 'any', visa: 'any', locations: '', companies: '', maxAgentRuns: 0 }, { tf: new TinyFish(), store });
   await t.test('different role returns nothing from these engineering boards', () => {
     assert.equal(r5.listings.length, 0);
