@@ -8,7 +8,7 @@ const { safeUrl } = require('./ats');
 const STOP = new Set(['and', 'or', 'of', 'the', 'a', 'an', 'for', 'to', 'in', 'at', 'with', 'on']);
 
 function norm(s) {
-  return String(s || '').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim();
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim();
 }
 function stem(w) {
   if (w.length > 5 && w.endsWith('ing')) return w.slice(0, -3);
@@ -194,25 +194,74 @@ const CITY_ALIASES = {
   'san jose': ['san jose', 'santa clara', 'sunnyvale', 'mountain view', 'palo alto', 'menlo park', 'cupertino'],
 };
 const US_STATES = 'AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' ');
-const COUNTRIES = {
-  US: ['united states', 'usa', 'us', 'u s', 'america'],
-  GB: ['united kingdom', 'uk', 'england', 'scotland', 'wales', 'london', 'manchester', 'edinburgh', 'cambridge uk'],
-  CA: ['canada', 'toronto', 'vancouver', 'montreal', 'waterloo', 'ottawa'],
-  IN: ['india', 'bengaluru', 'bangalore', 'hyderabad', 'pune', 'mumbai', 'delhi', 'gurugram', 'gurgaon', 'noida', 'chennai'],
-  DE: ['germany', 'berlin', 'munich', 'hamburg', 'deutschland'],
-  FR: ['france', 'paris'],
-  IE: ['ireland', 'dublin'],
-  NL: ['netherlands', 'amsterdam'],
-  SG: ['singapore'],
-  AU: ['australia', 'sydney', 'melbourne'],
-  JP: ['japan', 'tokyo'],
+// Country data: names typed as a location mean the whole country; cities place a location
+// in a country. One list feeds location matching, search countries and the dropdown.
+const COUNTRY_DATA = {
+  US: { name: "United States", names: ["united states", "usa", "us", "u s", "america", "united states of america"], cities: [] },
+  GB: { name: "United Kingdom", names: ["united kingdom", "uk", "gb", "great britain", "britain", "england", "scotland", "wales", "northern ireland"], cities: ["london", "manchester", "edinburgh", "glasgow", "bristol", "leeds", "cambridge uk", "oxford", "belfast"] },
+  IE: { name: "Ireland", names: ["ireland"], cities: ["dublin", "cork", "galway"] },
+  CA: { name: "Canada", names: ["canada"], cities: ["toronto", "vancouver", "montreal", "waterloo", "ottawa", "calgary", "edmonton"] },
+  IN: { name: "India", names: ["india"], cities: ["bengaluru", "bangalore", "hyderabad", "pune", "mumbai", "delhi", "new delhi", "gurugram", "gurgaon", "noida", "chennai", "kolkata", "ahmedabad", "kochi", "jaipur", "coimbatore", "thiruvananthapuram", "trivandrum", "indore", "chandigarh"] },
+  DE: { name: "Germany", names: ["germany", "deutschland"], cities: ["berlin", "munich", "munchen", "hamburg", "frankfurt", "cologne", "koln", "stuttgart", "dusseldorf"] },
+  FR: { name: "France", names: ["france"], cities: ["paris", "lyon", "toulouse", "marseille", "lille"] },
+  NL: { name: "Netherlands", names: ["netherlands", "holland", "the netherlands"], cities: ["amsterdam", "rotterdam", "utrecht", "eindhoven", "the hague"] },
+  BE: { name: "Belgium", names: ["belgium"], cities: ["brussels", "antwerp", "ghent"] },
+  LU: { name: "Luxembourg", names: ["luxembourg"], cities: [] },
+  CH: { name: "Switzerland", names: ["switzerland"], cities: ["zurich", "geneva", "basel", "lausanne", "zug"] },
+  AT: { name: "Austria", names: ["austria"], cities: ["vienna", "wien", "graz"] },
+  ES: { name: "Spain", names: ["spain", "espana"], cities: ["madrid", "barcelona", "valencia", "malaga", "seville"] },
+  PT: { name: "Portugal", names: ["portugal"], cities: ["lisbon", "lisboa", "porto"] },
+  IT: { name: "Italy", names: ["italy", "italia"], cities: ["milan", "milano", "rome", "roma", "turin", "torino"] },
+  SE: { name: "Sweden", names: ["sweden"], cities: ["stockholm", "gothenburg", "malmo"] },
+  NO: { name: "Norway", names: ["norway"], cities: ["oslo", "bergen"] },
+  DK: { name: "Denmark", names: ["denmark"], cities: ["copenhagen", "aarhus"] },
+  FI: { name: "Finland", names: ["finland"], cities: ["helsinki", "espoo", "tampere"] },
+  PL: { name: "Poland", names: ["poland"], cities: ["warsaw", "warszawa", "krakow", "wroclaw", "gdansk", "poznan"] },
+  CZ: { name: "Czechia", names: ["czechia", "czech republic"], cities: ["prague", "brno"] },
+  RO: { name: "Romania", names: ["romania"], cities: ["bucharest", "cluj napoca", "iasi"] },
+  HU: { name: "Hungary", names: ["hungary"], cities: ["budapest"] },
+  GR: { name: "Greece", names: ["greece"], cities: ["athens"] },
+  EE: { name: "Estonia", names: ["estonia"], cities: ["tallinn"] },
+  UA: { name: "Ukraine", names: ["ukraine"], cities: ["kyiv", "kiev", "lviv"] },
+  TR: { name: "Turkey", names: ["turkey", "turkiye"], cities: ["istanbul", "ankara"] },
+  IL: { name: "Israel", names: ["israel"], cities: ["tel aviv", "jerusalem", "haifa", "herzliya"] },
+  AE: { name: "United Arab Emirates", names: ["united arab emirates", "uae"], cities: ["dubai", "abu dhabi"] },
+  SA: { name: "Saudi Arabia", names: ["saudi arabia"], cities: ["riyadh", "jeddah"] },
+  EG: { name: "Egypt", names: ["egypt"], cities: ["cairo"] },
+  NG: { name: "Nigeria", names: ["nigeria"], cities: ["lagos", "abuja"] },
+  KE: { name: "Kenya", names: ["kenya"], cities: ["nairobi"] },
+  ZA: { name: "South Africa", names: ["south africa"], cities: ["cape town", "johannesburg"] },
+  SG: { name: "Singapore", names: ["singapore"], cities: [] },
+  MY: { name: "Malaysia", names: ["malaysia"], cities: ["kuala lumpur", "penang"] },
+  ID: { name: "Indonesia", names: ["indonesia"], cities: ["jakarta", "bandung"] },
+  PH: { name: "Philippines", names: ["philippines"], cities: ["manila", "makati", "taguig", "cebu"] },
+  VN: { name: "Vietnam", names: ["vietnam", "viet nam"], cities: ["ho chi minh city", "hanoi", "da nang"] },
+  TH: { name: "Thailand", names: ["thailand"], cities: ["bangkok"] },
+  JP: { name: "Japan", names: ["japan"], cities: ["tokyo", "osaka", "kyoto", "fukuoka"] },
+  KR: { name: "South Korea", names: ["south korea", "korea"], cities: ["seoul", "busan", "pangyo"] },
+  CN: { name: "China", names: ["china"], cities: ["beijing", "shanghai", "shenzhen", "hangzhou", "guangzhou", "chengdu"] },
+  HK: { name: "Hong Kong", names: ["hong kong"], cities: [] },
+  TW: { name: "Taiwan", names: ["taiwan"], cities: ["taipei", "hsinchu"] },
+  PK: { name: "Pakistan", names: ["pakistan"], cities: ["karachi", "lahore", "islamabad"] },
+  BD: { name: "Bangladesh", names: ["bangladesh"], cities: ["dhaka"] },
+  LK: { name: "Sri Lanka", names: ["sri lanka"], cities: ["colombo"] },
+  AU: { name: "Australia", names: ["australia"], cities: ["sydney", "melbourne", "brisbane", "perth", "adelaide", "canberra"] },
+  NZ: { name: "New Zealand", names: ["new zealand"], cities: ["auckland", "wellington", "christchurch"] },
+  BR: { name: "Brazil", names: ["brazil", "brasil"], cities: ["sao paulo", "rio de janeiro", "belo horizonte", "florianopolis", "curitiba"] },
+  MX: { name: "Mexico", names: ["mexico"], cities: ["mexico city", "ciudad de mexico", "guadalajara", "monterrey"] },
+  AR: { name: "Argentina", names: ["argentina"], cities: ["buenos aires"] },
+  CL: { name: "Chile", names: ["chile"], cities: ["santiago"] },
+  CO: { name: "Colombia", names: ["colombia"], cities: ["bogota", "medellin"] },
+  PE: { name: "Peru", names: ["peru"], cities: ["lima"] },
+  UY: { name: "Uruguay", names: ["uruguay"], cities: ["montevideo"] },
+  CR: { name: "Costa Rica", names: ["costa rica"], cities: [] },
 };
-const COUNTRY_INPUT = {
-  'united states': 'US', usa: 'US', us: 'US', 'u s': 'US', america: 'US',
-  'united kingdom': 'GB', uk: 'GB', england: 'GB', gb: 'GB',
-  canada: 'CA', india: 'IN', germany: 'DE', france: 'FR', ireland: 'IE',
-  netherlands: 'NL', singapore: 'SG', australia: 'AU', japan: 'JP',
-};
+const COUNTRIES = {};
+const COUNTRY_INPUT = {};
+for (const [code, c] of Object.entries(COUNTRY_DATA)) {
+  COUNTRIES[code] = [...c.names, ...c.cities];
+  for (const n of c.names) COUNTRY_INPUT[n] = code;
+}
 
 function locationText(listing) {
   return [listing.location, ...(listing.locations || [])].filter(Boolean).join(' ; ');
@@ -232,9 +281,11 @@ function inCountry(text, code) {
   }
   return false;
 }
-function otherCountry(text, code) {
+// A country named in the text that is not one of the user's countries ("Remote - Canada").
+function otherCountry(text, codes) {
+  const mine = new Set([].concat(codes));
   for (const c of Object.keys(COUNTRIES)) {
-    if (c !== code && inCountry(text, c)) return c;
+    if (!mine.has(c) && inCountry(text, c)) return c;
   }
   return null;
 }
@@ -258,7 +309,7 @@ function scoreLocation(listing, p) {
     if (aliases.some((a) => a && n.includes(` ${a} `))) return { score: 20, remote, reason: `in ${place}` };
   }
   if (remote && p.remoteOk) {
-    const other = otherCountry(text, p.country);
+    const other = otherCountry(text, p.countries || [p.country]);
     if (other) return { score: 6, remote, reason: `remote, but seems limited to ${other}` };
     return { score: 18, remote, reason: 'remote' };
   }
@@ -450,10 +501,18 @@ function normalizePrefs(raw = {}) {
   const places = locations.filter((l) => !/^remote\b/i.test(l));
   const remoteOk = !!raw.remoteOk || locations.some((l) => /^remote\b/i.test(l));
   const visa = raw.visa === 'need' ? 'need' : 'any';
-  const chosen = /^[A-Z]{2}$/.test(String(raw.country || '').toUpperCase()) ? String(raw.country).toUpperCase() : 'US';
-  // A typed city is more specific than the country dropdown, so it wins.
-  const inferred = inferCountry(places);
-  const country = inferred || chosen;
+  // Empty means Automatic. Each typed city is searched in its own country; the chosen country
+  // is for remote jobs and for cities the app does not recognize.
+  const chosen = /^[A-Z]{2}$/.test(String(raw.country || '').toUpperCase()) ? String(raw.country).toUpperCase() : null;
+  const known = places.map((pl) => inferCountry([pl]));
+  const placeCountries = known.map((c) => c || chosen || 'US');
+  const country = known.find(Boolean) || chosen || 'US';
+  const remoteCountry = chosen || country;
+  const countries = [...new Set([...placeCountries, remoteCountry])];
+  const differ = chosen ? places.filter((pl, i) => known[i] && known[i] !== chosen) : [];
+  const countryNote = differ.length
+    ? `${differ.map((pl) => `${pl} is searched in ${inferCountry([pl])}`).join(', ')}. Your country setting (${chosen}) is used for remote jobs and places the app does not recognize.`
+    : null;
   const days = Number.parseInt(raw.postedWithinDays, 10);
   const agents = Number.parseInt(raw.maxAgentRuns, 10);
   return {
@@ -464,7 +523,10 @@ function normalizePrefs(raw = {}) {
     places,
     remoteOk,
     country,
-    countryFrom: inferred && inferred !== chosen ? places[0] : null,
+    placeCountries,
+    remoteCountry,
+    countries,
+    countryNote,
     visa,
     hideNoSponsor: visa === 'need' && raw.hideNoSponsor !== false,
     keywords: list(raw.keywords, /[,;\n]/, 10, 40),
@@ -478,5 +540,5 @@ function normalizePrefs(raw = {}) {
 
 module.exports = {
   normalizePrefs, evaluate, dedupe, canonicalUrl, detectLevel, detectVisa, scoreLocation,
-  isRemote, roleExpansions, inferCountry, scoreRole, correctRole, editDistance, LEVEL_LABEL, norm, toks,
+  isRemote, roleExpansions, inferCountry, scoreRole, correctRole, editDistance, LEVEL_LABEL, COUNTRY_DATA, norm, toks,
 };

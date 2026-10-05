@@ -40,6 +40,7 @@ test('full pipeline against mock TinyFish', async (t) => {
     assert.equal(r1.usage.agent.runs, 4, 'umbrella lite + stealth retry, vandelay, pied piper ashby board');
     for (const f of mock.st.calls.fetch) assert.ok(f.urls.length <= 10);
     for (const s of mock.st.calls.search) assert.ok(s.include_domains || s.exclude_domains, 'search is scoped');
+    assert.ok(mock.st.calls.search.every((s) => s.location === 'US'), 'New York and remote are searched in the US');
   });
 
   await t.test('stealth retry happened only for the blocked site', () => {

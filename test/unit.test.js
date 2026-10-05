@@ -154,12 +154,27 @@ test('Agent output schema only uses keywords TinyFish accepts', () => {
   assert.doesNotThrow(() => validateSchema(OUTPUT_SCHEMA));
 });
 
-test('search country follows the typed city', () => {
+test('each city is searched in its own country', () => {
+  // A typed city beats the country setting, and the app says so.
+  const ny = normalizePrefs({ role: 'x', locations: 'New York', country: 'GB' });
+  assert.equal(ny.country, 'US');
+  assert.equal(ny.remoteCountry, 'GB', 'the setting is used for remote jobs');
+  assert.match(ny.countryNote, /New York is searched in US/);
+  assert.deepEqual(normalizePrefs({ role: 'x', locations: 'New York; London' }).placeCountries, ['US', 'GB']);
   assert.equal(normalizePrefs({ role: 'x', locations: 'Bangalore', country: 'US' }).country, 'IN');
-  assert.equal(normalizePrefs({ role: 'x', locations: 'Bangalore', country: 'US' }).countryFrom, 'Bangalore');
-  assert.equal(normalizePrefs({ role: 'x', locations: 'London; Remote' }).country, 'GB');
-  assert.equal(normalizePrefs({ role: 'x', locations: 'New York', country: 'US' }).countryFrom, null);
-  assert.equal(normalizePrefs({ role: 'x', locations: 'Kochi', country: 'IN' }).country, 'IN', 'unknown city keeps the dropdown');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Remote', country: 'GB' }).country, 'GB');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Springfield', country: 'IE' }).country, 'IE', 'unknown city uses the setting');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'Springfield' }).country, 'US', 'automatic falls back to US');
+  assert.deepEqual(normalizePrefs({ role: 'x', locations: 'Zürich; São Paulo; Kraków' }).placeCountries, ['CH', 'BR', 'PL'], 'accents work');
+  assert.equal(normalizePrefs({ role: 'x', locations: 'New York', country: 'US' }).countryNote, null);
+});
+
+test('a country typed as a location matches its cities', () => {
+  const de = normalizePrefs({ role: 'x', locations: 'Germany' });
+  assert.ok(scoreLocation({ location: 'München, Bayern' }, de).score > 0);
+  assert.ok(scoreLocation({ location: 'Paris, France' }, de).drop);
+  const two = normalizePrefs({ role: 'x', locations: 'New York; London; Remote' });
+  assert.equal(scoreLocation({ location: 'Remote - UK' }, two).score, 18, 'remote in one of your countries is not penalized');
 });
 
 test('Search asks each job system separately', () => {
@@ -167,6 +182,10 @@ test('Search asks each job system separately', () => {
   const single = qs.filter((q) => q.domains.length <= 2).map((q) => q.label);
   assert.deepEqual(single, ['Greenhouse', 'Lever', 'Ashby', 'Workday', 'SmartRecruiters and Workable']);
   assert.ok(qs.length <= 8);
+  const two = buildQueries(normalizePrefs({ role: 'software engineer', locations: 'New York; London' }));
+  assert.equal(two.filter((q) => q.domains.length <= 2 && q.country === 'US').length, 5);
+  assert.equal(two.filter((q) => q.domains.length <= 2 && q.country === 'GB').length, 5);
+  assert.ok(two.length <= 16, 'stays under the Search rate limit');
 });
 
 test('builds Workday jobs from a plain links list', () => {

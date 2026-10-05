@@ -23,16 +23,24 @@ const DOMAIN_GROUPS = [
   { name: 'SmartRecruiters and Workable', domains: ['jobs.smartrecruiters.com', 'apply.workable.com'] },
 ];
 
+// Each of the first two places gets one query per job system, in that place's own country
+// ("New York; London" searches the US and the UK). Later places, keywords and remote get
+// one query across all systems. Search allows 30 requests a minute, so this stays at 16 or fewer.
 function buildQueries(p) {
   const lvl = LEVEL_WORDS[p.seniority] || '';
-  const place = p.places[0] || (p.remoteOk ? 'remote' : '');
-  const base = [p.role, lvl, place].filter(Boolean).join(' ');
-  const q = DOMAIN_GROUPS.map((g) => ({ label: g.name, query: base, domains: g.domains }));
-  q.push({ label: 'recent, all systems', query: base, domains: ATS_DOMAINS, recency_minutes: (p.postedWithinDays || 30) * 1440 });
-  if (p.keywords.length) q.push({ label: 'with keywords', query: [p.role, lvl, ...p.keywords.slice(0, 2)].filter(Boolean).join(' '), domains: ATS_DOMAINS });
-  if (p.places[1]) q.push({ label: 'second location', query: [p.role, lvl, p.places[1]].filter(Boolean).join(' '), domains: ATS_DOMAINS });
-  if (p.remoteOk && p.places.length) q.push({ label: 'remote', query: [p.role, lvl, 'remote'].filter(Boolean).join(' '), domains: ATS_DOMAINS });
-  return q.slice(0, 8);
+  const text = (place) => [p.role, lvl, place].filter(Boolean).join(' ');
+  const countries = p.placeCountries || [];
+  const q = [];
+  const atsPlaces = p.places.length ? p.places.slice(0, 2) : [p.remoteOk ? 'remote' : ''];
+  atsPlaces.forEach((place, i) => {
+    const country = p.places.length ? countries[i] || p.country : p.remoteCountry || p.country;
+    for (const g of DOMAIN_GROUPS) q.push({ label: g.name, query: text(place), domains: g.domains, country });
+  });
+  q.push({ label: 'recent, all systems', query: text(atsPlaces[0]), domains: ATS_DOMAINS, country: q[0].country, recency_minutes: (p.postedWithinDays || 30) * 1440 });
+  if (p.keywords.length) q.push({ label: 'with keywords', query: [p.role, lvl, ...p.keywords.slice(0, 2)].filter(Boolean).join(' '), domains: ATS_DOMAINS, country: p.country });
+  p.places.slice(2, 4).forEach((place, i) => q.push({ label: 'another location', query: text(place), domains: ATS_DOMAINS, country: countries[i + 2] || p.country }));
+  if (p.remoteOk && p.places.length) q.push({ label: 'remote', query: text('remote'), domains: ATS_DOMAINS, country: p.remoteCountry || p.country });
+  return q.slice(0, 16);
 }
 
 function cleanSearchTitle(t) {
@@ -183,13 +191,13 @@ async function discover(p, tf, log, warnings) {
         const results = await tf.search({
           query: q.query,
           include_domains: q.domains,
-          location: p.country,
+          location: q.country || p.country,
           recency_minutes: q.recency_minutes,
           purpose: `Find open ${p.role} job postings on company job boards`,
         });
         let added = 0;
         for (const r of results) if (addHit(acc, r, 'search')) added++;
-        log('search', `"${q.query}" on ${q.label}: ${plural(results.length, 'hit')}, ${plural(added, 'new board')}`);
+        log('search', `"${q.query}" on ${q.label}, in ${q.country || p.country}: ${plural(results.length, 'hit')}, ${plural(added, 'new board')}`);
       } catch (err) {
         warnings.push(`Search "${q.query}" failed: ${err.message}`);
       }
