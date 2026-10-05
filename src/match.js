@@ -309,7 +309,7 @@ function scoreLocation(listing, p) {
     if (aliases.some((a) => a && n.includes(` ${a} `))) return { score: 20, remote, reason: `in ${place}` };
   }
   if (remote && p.remoteOk) {
-    const other = otherCountry(text, p.countries || [p.country]);
+    const other = p.remoteAnywhere ? null : otherCountry(text, p.countries || [p.country]);
     if (other) return { score: 6, remote, reason: `remote, but seems limited to ${other}` };
     return { score: 18, remote, reason: 'remote' };
   }
@@ -501,15 +501,20 @@ function normalizePrefs(raw = {}) {
   const places = locations.filter((l) => !/^remote\b/i.test(l));
   const remoteOk = !!raw.remoteOk || locations.some((l) => /^remote\b/i.test(l));
   const visa = raw.visa === 'need' ? 'need' : 'any';
-  // Empty means Automatic. Each typed city is searched in its own country; the chosen country
-  // is for remote jobs and for cities the app does not recognize.
-  const chosen = /^[A-Z]{2}$/.test(String(raw.country || '').toUpperCase()) ? String(raw.country).toUpperCase() : null;
+  // remoteCountry: the country remote jobs must be open to. '' = the first city's country,
+  // 'ANY' = anywhere, else a 2-letter code. It is also used for cities the app does not
+  // recognize. Older saved searches send country instead, which meant the same thing.
+  const explicitRemote = raw.remoteCountry !== undefined && raw.remoteCountry !== null;
+  const rc = String(explicitRemote ? raw.remoteCountry : raw.country || '').toUpperCase();
+  const remoteAnywhere = rc === 'ANY';
+  const chosen = /^[A-Z]{2}$/.test(rc) ? rc : null;
   const known = places.map((pl) => inferCountry([pl]));
   const placeCountries = known.map((c) => c || chosen || 'US');
   const country = known.find(Boolean) || chosen || 'US';
   const remoteCountry = chosen || country;
   const countries = [...new Set([...placeCountries, remoteCountry])];
-  const differ = chosen ? places.filter((pl, i) => known[i] && known[i] !== chosen) : [];
+  // Only the old single country setting needs explaining; the remote control says what it does.
+  const differ = chosen && !explicitRemote ? places.filter((pl, i) => known[i] && known[i] !== chosen) : [];
   const countryNote = differ.length
     ? `${differ.map((pl) => `${pl} is searched in ${inferCountry([pl])}`).join(', ')}. Your country setting (${chosen}) is used for remote jobs and places the app does not recognize.`
     : null;
@@ -522,6 +527,7 @@ function normalizePrefs(raw = {}) {
     locations,
     places,
     remoteOk,
+    remoteAnywhere,
     country,
     placeCountries,
     remoteCountry,

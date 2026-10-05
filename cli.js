@@ -25,7 +25,7 @@ async function main() {
   const a = args(process.argv);
   if (!a.role) {
     console.log('Usage: node cli.js --role "data analyst" [--level intern|entry|mid|senior|staff|manager]');
-    console.log('       [--locations "Boston; London; Remote"] [--country GB (for remote; cities pick their own)] [--visa need] [--keywords "sql, python"]');
+    console.log('       [--locations "Boston; London"] [--remote] [--remote-country GB|ANY] [--visa need] [--keywords "sql, python"]');
     console.log('       [--exclude "clearance"] [--companies "Stripe, https://careers.example.com"] [--days 30]');
     console.log('       [--agents 2] [--no-discover] [--refresh] [--top 25] [--out results.json]');
     process.exit(1);
@@ -33,6 +33,7 @@ async function main() {
   const prefs = {
     role: a.role, seniority: a.level || 'any', locations: a.locations || '', country: a.country || '',
     visa: a.visa === 'need' ? 'need' : 'any', keywords: a.keywords || '', exclude: a.exclude || '',
+    remoteOk: !!a.remote, ...(a['remote-country'] !== undefined ? { remoteCountry: a['remote-country'] === 'true' ? '' : a['remote-country'] } : {}),
     companies: a.companies || '', postedWithinDays: a.days || 30, maxAgentRuns: a.agents ?? 2,
     discover: !a['no-discover'],
   };

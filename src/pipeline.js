@@ -28,7 +28,8 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const p = normalizePrefs(rawPrefs);
   const searchId = store.searchIdFor(p);
   const warnings = [];
-  if (p.places.length) log('step', `Search countries: ${p.places.map((pl, i) => `${pl} in ${p.placeCountries[i]}`).join(', ')}${p.remoteOk ? `, remote in ${p.remoteCountry}` : ''}`);
+  const remoteText = p.remoteAnywhere ? 'remote jobs open to anywhere' : `remote jobs open to ${p.remoteCountry}`;
+  if (p.places.length || p.remoteOk) log('step', `Search countries: ${[...p.places.map((pl, i) => `${pl} in ${p.placeCountries[i]}`), ...(p.remoteOk ? [remoteText] : [])].join(', ')}`);
   if (p.countryNote) warnings.push(p.countryNote);
   // Server-wide ceiling on Agent runs, for public deploys where visitors spend your credits.
   const limit = Number.parseInt(process.env.AGENT_RUNS_LIMIT, 10);

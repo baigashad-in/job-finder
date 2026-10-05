@@ -169,6 +169,27 @@ test('each city is searched in its own country', () => {
   assert.equal(normalizePrefs({ role: 'x', locations: 'New York', country: 'US' }).countryNote, null);
 });
 
+test('remote jobs have their own switch and country', () => {
+  const city = normalizePrefs({ role: 'x', locations: 'London', remoteOk: true, remoteCountry: '' });
+  assert.equal(city.remoteCountry, 'GB', "my city's country");
+  assert.equal(scoreLocation({ location: 'Remote - Canada' }, city).score, 6, 'remote limited to another country ranks low');
+  const india = normalizePrefs({ role: 'x', locations: 'London', remoteOk: true, remoteCountry: 'IN' });
+  assert.equal(india.remoteCountry, 'IN');
+  assert.equal(india.countryNote, null, 'the remote control explains itself');
+  assert.equal(buildQueries(india).find((q) => q.label === 'remote').country, 'IN', 'remote search runs in that country');
+  const anywhere = normalizePrefs({ role: 'x', locations: 'London', remoteOk: true, remoteCountry: 'ANY' });
+  assert.equal(anywhere.remoteAnywhere, true);
+  assert.equal(scoreLocation({ location: 'Remote - Canada' }, anywhere).score, 18, 'anywhere: no penalty');
+  const only = normalizePrefs({ role: 'x', locations: '', remoteOk: true, remoteCountry: 'CA' });
+  assert.equal(only.remoteCountry, 'CA');
+  assert.ok(scoreLocation({ location: 'Toronto, ON' }, only).drop, 'remote only: an office job is not shown');
+  const off = normalizePrefs({ role: 'x', locations: 'London', remoteOk: false, remoteCountry: 'IN' });
+  assert.ok(scoreLocation({ location: 'Remote' }, off).drop, 'switch off: remote jobs are not shown');
+  const legacy = normalizePrefs({ role: 'x', locations: 'New York; Remote', country: 'GB' });
+  assert.equal(legacy.remoteOk, true, 'older searches with "Remote" typed still work');
+  assert.equal(legacy.remoteCountry, 'GB');
+});
+
 test('a country typed as a location matches its cities', () => {
   const de = normalizePrefs({ role: 'x', locations: 'Germany' });
   assert.ok(scoreLocation({ location: 'München, Bayern' }, de).score > 0);

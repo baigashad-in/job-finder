@@ -8,7 +8,7 @@ A job and internship finder for students. **TinyFish Search** finds which compan
 
 _Add a 60 to 90 second GIF or MP4 after a live run._ Suggested shots:
 
-1. Type a real search ("software engineer, intern, New York; Remote, need sponsorship"), add two companies you follow, press **Find jobs**.
+1. Type a real search ("software engineer, intern, New York, need sponsorship"), switch on **Remote jobs** open to a country, add two companies you follow, press **Find jobs**.
 2. The pipeline at the top of the results: Search, Fetch and Agent fill in one after another, and each running Agent site shows a **Watch live** link; open one in a second tab.
 3. Results: match score, reasons, a visa chip with the quoted sentence, **Apply** opening the real posting.
 4. "Where these came from": which API read each company, and how many jobs each filter removed.
@@ -79,7 +79,7 @@ Environment variables:
 Command line version:
 
 ```bash
-node cli.js --role "data analyst" --level entry --locations "Chicago; Remote" \
+node cli.js --role "data analyst" --level entry --locations "Chicago" --remote --remote-country US \
   --visa need --keywords "sql, tableau" --companies "Stripe, Figma" --agents 0 --out results.json
 ```
 
@@ -131,7 +131,7 @@ Before you make it public:
 
 ## What each TinyFish API does here
 
-**Search (free)** asks each job system separately (Greenhouse, Lever, Ashby, Workday, then SmartRecruiters and Workable), using `include_domains`, because one combined query returns only 10 results and one system can crowd out the rest. Each city you type is searched in its own country ("New York; London" searches the US and the UK; 58 countries and their main tech cities are known, accents included). The country setting defaults to Automatic and is used for remote jobs and for cities the app does not recognize; when it disagrees with a typed city, the city wins and the results say so. An extra query across all systems uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
+**Search (free)** asks each job system separately (Greenhouse, Lever, Ashby, Workday, then SmartRecruiters and Workable), using `include_domains`, because one combined query returns only 10 results and one system can crowd out the rest. Each city you type is searched in its own country ("New York; London" searches the US and the UK; 58 countries and their main tech cities are known, accents included). Remote jobs have their own switch under the search sentence, with the country they must be open to: your city's country (the default), anywhere, or one of the 58 countries. The remote searches run in that country, and remote jobs limited to a different country rank lower with a note; "anywhere" turns that off. A city the app does not recognize uses that country too, or you can add the country to the city ("Kochi, India"). Older searches with "Remote" typed in the locations still work. An extra query across all systems uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
 
 **Fetch (free)** reads the public JSON feed that Greenhouse, Lever, Ashby and SmartRecruiters publish for each company: every open job with title, location, date and usually the full description. Lever and Ashby feeds hold raw HTML inside their JSON, which can break when converted to markdown, so a feed that does not parse is fetched again as HTML and the JSON is taken from that. If that fails too (Ashby feeds come back as only their description HTML), Fetch's `json` format is tried, and a board that still yields nothing goes to the Agent. It also confirms a watchlist company's board by trying its likely feed URLs, falls back to the human board page if a feed cannot be parsed, reads Workday search results pages (`?q=software engineer`, plus a second query with your city, taking job links from the page text or from Fetch's separate links list, and matching each link to the page text by job ID for its location and posted date; titles the page leaves out are rebuilt from the URL and replaced with the real one when the posting page is read, which also gives the work style, such as Hybrid or Remote), and reads the posting pages of top matches that have no description yet. That page text drives visa detection, keyword matching and removal of closed postings. Normal runs accept a cache entry up to 1 hour old (`ttl: 3600`); **Skip caches** sends `ttl: 0`.
 
@@ -143,7 +143,7 @@ Every job gets points for each of these, and some rules remove a job completely.
 
 * **Role (40 points).** The title must contain your role or a closely related title. "Software engineer" also matches "backend engineer", "full stack developer" and "member of technical staff". Titles that are clearly a different job (recruiter, sales, marketing, legal) are removed even when they mention your role, so "Technical Recruiter, Software Engineering" does not show up for a software engineer search.
 * **Level (20 points).** Read from the title: intern, entry or new grad, mid, senior, staff and above, manager. "Software Engineer I" is entry, "II" is mid. An intern search only keeps internships and co-ops. A new grad search removes senior roles.
-* **Location (20 points).** City nicknames work (NYC, SF, Bay Area, Bangalore). Countries work ("United States" matches "Austin, TX"). If you allow remote, remote jobs count, but "Remote, Canada" scores low for a US search.
+* **Location (20 points).** City nicknames work (NYC, SF, Bay Area, Bangalore). Countries work ("United States" matches "Austin, TX"). With **Remote jobs** on, remote jobs count, but "Remote, Canada" scores low when remote jobs must be open to the US; choose "anywhere" to treat every remote job alike.
 * **Visa (10 points).** The app reads the description and labels each job as **mentions sponsorship**, **mentions OPT/CPT**, **no sponsorship** (including "must be a US citizen" and security clearance), or **not mentioned**. It shows the sentence it found. Application form questions like "Are you authorized to work without sponsorship?" are ignored, because they are questions, not policy. If you need sponsorship, jobs that say no are hidden (you can turn this off).
 * **Keywords (12 points)** count more in the title than in the description. **Hidden words** remove a job.
 * **Freshness (10 points).** Newer postings rank higher. Postings older than your "posted within" setting are removed.
@@ -170,7 +170,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-57 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+58 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 
@@ -190,7 +190,7 @@ The end-to-end test checks that a full run uses all three APIs, returns exactly 
 * `server.js`: web server, background search tasks, saved searches, scheduled refresh
 * `cli.js`: command line version
 * `debug-fetch.js`: shows what Fetch returns for one URL
-* `public/index.html`: the whole UI, plain HTML, CSS and JavaScript (search sentence, live four-step pipeline, ranked results with the API that found each job)
+* `public/index.html`: the whole UI, plain HTML, CSS and JavaScript (search sentence, live four-step pipeline, ranked results with the API that found each job), in a black, red, sage and blush palette with a dark mode
 * `src/tinyfish.js`: Search, Fetch and Agent client with retries, timeouts and usage counts
 * `src/discover.js`: step 1, Search queries and watchlist lookup
 * `src/read.js`: steps 2 and 5, Fetch for feeds and posting pages

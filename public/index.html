@@ -4,19 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Job finder</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><ellipse cx='14' cy='16' rx='10' ry='7' fill='%230B6B63'/><path d='M23 16l7-6v12z' fill='%230B6B63'/><circle cx='9' cy='14' r='1.6' fill='white'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><ellipse cx='14' cy='16' rx='10' ry='7' fill='%23E92921'/><path d='M23 16l7-6v12z' fill='%23E92921'/><circle cx='9' cy='14' r='1.6' fill='white'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --paper: #F3F5F2; --panel: #FFFFFF; --ink: #16202B; --muted: #5B6670; --faint: #8A939B; --line: #DDE2DC;
-  --hero: #E3EEE9; --slot: #FFFFFF; --slot-line: #B9D3CA;
-  --search: #0B6B63; --search-soft: #DCEFEA;
-  --fetch: #4A55C9; --fetch-soft: #E5E7FA;
-  --agent: #B7791F; --agent-soft: #F8ECD6;
-  --new: #F2B33D; --new-ink: #3B2A00;
-  --good: #2D6A3E; --good-soft: #E0EFE3; --bad: #A5402A; --bad-soft: #F6E2DB;
+  /* Black, red, sage and blush. Red marks what to act on or notice (the main button,
+     New, the Agent); warnings use black with a "!" badge so they never look like highlights. */
+  --paper: #ECE1E0; --panel: #FFFFFF; --ink: #1A1110; --muted: #6A5F5E; --faint: #9A8E8D; --line: #DDD2D1;
+  --hero: #1A1110; --hero-ink: #FFFFFF; --hero-muted: #C9BFBE; --hero-line: #6A5F5E;
+  --slot: #AEC3BA; --slot-ink: #1A1110; --slot-line: #AEC3BA;
+  --accent: #CC2018; --accent-ink: #FFFFFF; --brand: #E92921; --link: #B81D16; --focus: #4D6A5E;
+  --search: #4D6A5E; --search-soft: #E4ECE8;
+  --fetch: #1A1110; --fetch-soft: #F1EBEA;
+  --agent: #B81D16; --agent-fill: #CC2018; --agent-soft: #FBE3E1;
+  --new: #CC2018; --new-ink: #FFFFFF;
+  --good: #4D6A5E; --good-soft: #E4ECE8;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   color-scheme: light dark;
@@ -25,21 +29,23 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #12171D; --panel: #192028; --ink: #E8ECEF; --muted: #A3ADB6; --faint: #7C8791; --line: #2C3540;
-    --hero: #16282A; --slot: #1E2B2E; --slot-line: #2F4D49;
-    --search: #4CC2B3; --search-soft: #173430;
-    --fetch: #9AA3F5; --fetch-soft: #232849;
-    --agent: #E5B35A; --agent-soft: #3A2D16;
-    --new: #E8B83A; --new-ink: #2A1F00;
-    --good: #8FD3A0; --good-soft: #1E3326; --bad: #F0957B; --bad-soft: #3A2620;
+    --paper: #14100F; --panel: #1F1817; --ink: #F3ECEB; --muted: #B8ADAC; --faint: #85797A; --line: #3A302F;
+    --hero: #2A201F; --hero-ink: #FFFFFF; --hero-muted: #C9BFBE; --hero-line: #85797A;
+    --slot: #AEC3BA; --slot-ink: #1A1110; --slot-line: #AEC3BA;
+    --accent: #D2261D; --accent-ink: #FFFFFF; --brand: #E92921; --link: #FF8A82; --focus: #AEC3BA;
+    --search: #AEC3BA; --search-soft: #24302B;
+    --fetch: #F3ECEB; --fetch-soft: #2E2625;
+    --agent: #FF7A70; --agent-fill: #D2261D; --agent-soft: #3A1E1C;
+    --new: #D2261D; --new-ink: #FFFFFF;
+    --good: #AEC3BA; --good-soft: #24302B;
   }
 }
 *, *::before, *::after { box-sizing: inherit; }
 [hidden] { display: none !important; }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); }
-a { color: var(--search); }
-:focus-visible { outline: 3px solid var(--search); outline-offset: 2px; border-radius: 6px; }
+a { color: var(--link); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px 72px; }
 
@@ -50,43 +56,64 @@ a { color: var(--search); }
 .keystate { display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--muted); background: var(--panel); border: 1px solid var(--line); padding: 5px 12px; border-radius: 999px; }
 .keystate .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .keystate.ok .dot { background: var(--search); }
-.keystate.bad { color: var(--bad); }
-.keystate.bad .dot { background: var(--bad); }
+.keystate.bad { color: var(--ink); font-weight: 700; }
+.keystate.bad .dot { background: var(--panel); border: 2px solid var(--ink); }
 
 /* Hero: the search as one sentence */
-.hero { background: var(--hero); border-radius: 22px; padding: clamp(24px, 4vw, 44px); }
+.hero { background: var(--hero); color: var(--hero-ink); border-radius: 22px; padding: clamp(24px, 4vw, 44px); }
+.hero :focus-visible { outline-color: var(--slot); }
 .sentence { font: 500 clamp(1.6rem, 3.6vw, 2.6rem)/1.5 var(--display); letter-spacing: -0.015em; margin: 0 0 22px; max-width: 26em; }
 .sentence input, .sentence select {
-  font: 700 1em/1.15 var(--display); letter-spacing: -0.015em; color: var(--search);
+  font: 700 1em/1.15 var(--display); letter-spacing: -0.015em; color: var(--slot-ink);
   background: var(--slot); border: 1.5px solid var(--slot-line); border-radius: 12px;
   padding: .02em .28em .06em; margin: .1em .08em; min-width: 3ch; vertical-align: baseline;
   appearance: none; -webkit-appearance: none;
 }
 .sentence select {
   cursor: pointer; padding-right: 1.05em;
-  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%230B6B63' stroke-width='2'/></svg>");
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%231A1110' stroke-width='2'/></svg>");
   background-repeat: no-repeat; background-position: right .3em center; background-size: .42em auto;
 }
-.sentence input:hover, .sentence select:hover { border-color: var(--search); }
-.sentence input:focus, .sentence select:focus { outline: none; border-color: var(--search); box-shadow: 0 0 0 4px var(--search-soft); }
-.sentence input::placeholder { color: var(--faint); font-weight: 500; }
+.sentence input:hover, .sentence select:hover { border-color: var(--hero-ink); }
+.sentence input:focus, .sentence select:focus { outline: none; border-color: var(--hero-ink); box-shadow: 0 0 0 4px rgba(174, 195, 186, .35); }
+.sentence input::placeholder { color: #4D5A55; font-weight: 500; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+/* Remote switch and the country remote jobs must be open to */
+.remote-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin: 0 0 24px; }
+.toggle { display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; border-radius: 999px; border: 1.5px solid var(--hero-line); color: var(--hero-ink); font-weight: 700; cursor: pointer; user-select: none; }
+.toggle:has(input:checked) { border-color: var(--slot); }
+.toggle input { appearance: none; -webkit-appearance: none; flex: none; width: 36px; height: 20px; border-radius: 999px; background: var(--hero-line); position: relative; cursor: pointer; margin: 0; transition: background .15s; }
+.toggle input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.toggle input:checked { background: var(--slot); }
+.toggle input:checked::before { transform: translateX(16px); background: var(--slot-ink); }
+.remote-label { color: var(--hero-muted); }
+.remote-select { font: 700 1rem var(--body); color: var(--slot-ink); background: var(--slot); border: 0; border-radius: 10px; padding: 9px 12px; cursor: pointer; max-width: 100%; }
+.remote-select:disabled, .remote-label.off { opacity: .45; cursor: not-allowed; }
 button { font: 700 1rem var(--body); border-radius: 12px; padding: 11px 20px; cursor: pointer; border: 1.5px solid transparent; color: var(--ink); }
-button.primary { background: var(--search); color: #fff; }
+button.primary { background: var(--accent); color: var(--accent-ink); }
 button.primary:hover { filter: brightness(1.08); }
 button.ghost { background: var(--panel); border-color: var(--line); }
-button.ghost:hover { border-color: var(--search); }
-button.quiet { background: none; color: var(--search); padding: 11px 10px; }
+button.ghost:hover { border-color: var(--ink); }
+button.quiet { background: none; color: var(--link); padding: 11px 10px; }
 button:disabled { opacity: .6; cursor: progress; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #062521; } }
-.powered { margin: 18px 0 0; color: var(--muted); font-size: .9rem; }
-.err { color: var(--bad); margin: 12px 0 0; font-weight: 700; }
+.hero button.ghost { background: transparent; color: var(--hero-ink); border-color: var(--hero-line); }
+.hero button.ghost:hover { border-color: var(--hero-ink); }
+.hero button.quiet { color: var(--slot); }
+.powered { margin: 18px 0 0; color: var(--hero-muted); font-size: .9rem; }
+.err, .warnings li { position: relative; padding-left: 24px; }
+.err::before, .warnings li::before {
+  content: "!"; position: absolute; left: 0; top: .15em; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--ink); color: var(--panel); font: 800 12px/17px var(--display); text-align: center;
+}
+.err { color: var(--ink); margin: 12px 0 0; font-weight: 700; }
+.hero .err { color: var(--hero-ink); }
+.hero .err::before { background: var(--slot); color: var(--slot-ink); }
 
 /* More options drawer */
 .drawer { margin-top: 22px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 @media (max-width: 760px) { .drawer { grid-template-columns: 1fr; } }
-.drawer fieldset { margin: 0; border: 1px solid var(--line); background: var(--panel); border-radius: 16px; padding: 14px 16px 16px; min-width: 0; }
+.drawer fieldset { color: var(--ink); margin: 0; border: 1px solid var(--line); background: var(--panel); border-radius: 16px; padding: 14px 16px 16px; min-width: 0; }
 /* A floated legend sits inside the box instead of cutting into its border. */
 .drawer legend { float: left; width: 100%; font: 700 1.05rem var(--display); padding: 0; margin: 0 0 6px; }
 .drawer legend + * { clear: both; }
@@ -115,8 +142,8 @@ h2.section { font: 700 1.2rem var(--display); margin: 0 0 12px; }
 /* Pipeline: the four steps of a search */
 .run { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 20px clamp(16px, 3vw, 26px) 16px; }
 .run-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-button.stop { padding: 7px 16px; border-radius: 10px; background: var(--panel); color: var(--bad); border: 1.5px solid var(--bad); font-size: .925rem; }
-button.stop:hover { background: var(--bad-soft); }
+button.stop { padding: 7px 16px; border-radius: 10px; background: var(--panel); color: var(--ink); border: 1.5px solid var(--ink); font-size: .925rem; }
+button.stop:hover { background: var(--fetch-soft); }
 button.stop:disabled { color: var(--muted); border-color: var(--line); background: var(--panel); }
 .run-head h2 { font: 700 1.2rem var(--display); margin: 0 auto 0 0; }
 .run-head .sub { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
@@ -136,12 +163,13 @@ button.stop:disabled { color: var(--muted); border-color: var(--line); backgroun
 .station .watch a { font-weight: 700; color: var(--agent); }
 .station[data-stage="search"] { --c: var(--search); --cs: var(--search-soft); }
 .station[data-stage="fetch"] { --c: var(--fetch); --cs: var(--fetch-soft); }
-.station[data-stage="agent"] { --c: var(--agent); --cs: var(--agent-soft); }
+.station[data-stage="agent"] { --c: var(--agent-fill); --cs: var(--agent-soft); --ct: var(--agent); }
 .station[data-stage="match"] { --c: var(--ink); --cs: var(--line); }
 .station.active .num, .station.done .num { border-color: var(--c); color: var(--c); background: var(--cs); }
 .station.done .num { background: var(--c); color: var(--panel); }
 .station.done::after { background: var(--c); }
-.station.active .stat, .station.done .stat { color: var(--c); }
+/* --ct: a text shade of the step color, for when the fill shade is too dark to read as text */
+.station.active .stat, .station.done .stat { color: var(--ct, var(--c)); }
 .station.skipped .stat { color: var(--faint); }
 @media (prefers-reduced-motion: no-preference) {
   .station.active .num { animation: pulse 1.4s ease-in-out infinite; }
@@ -154,14 +182,14 @@ details.log li { padding: 2px 0; color: var(--muted); }
 details.log li.step { color: var(--ink); font-weight: 700; margin-top: 4px; }
 details.log .kind { display: inline-block; min-width: 4.6em; font-weight: 700; }
 details.log li.search .kind { color: var(--search); } details.log li.fetch .kind { color: var(--fetch); }
-details.log li.agent .kind { color: var(--agent); } details.log li.warn .kind, details.log li.error .kind { color: var(--bad); }
+details.log li.agent .kind { color: var(--agent); } details.log li.warn .kind, details.log li.error .kind { color: var(--ink); text-decoration: underline; }
 details.log li.step .kind { display: none; }
 
 /* Results */
 .results-head { margin: 34px 0 4px; }
 .results-head h2 { font: 700 clamp(1.35rem, 2.6vw, 1.75rem)/1.25 var(--display); letter-spacing: -0.01em; margin: 0; max-width: 34em; }
 .results-head p { color: var(--muted); margin: 6px 0 0; }
-.note { background: var(--agent-soft); border-radius: 12px; padding: 10px 14px; margin: 28px 0 0; font-size: .95rem; }
+.note { background: var(--search-soft); border-radius: 12px; padding: 10px 14px; margin: 28px 0 0; font-size: .95rem; }
 .toolbar {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; padding: 12px 0;
   position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 3; border-bottom: 1px solid var(--line);
@@ -170,9 +198,8 @@ details.log li.step .kind { display: none; }
 .toolbar input[type=search] { flex: 1 1 270px; min-width: 0; }
 .pill { position: relative; display: inline-flex; align-items: center; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: .925rem; cursor: pointer; user-select: none; }
 .pill input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.pill:has(input:checked) { background: var(--search); border-color: var(--search); color: #fff; }
-.pill:has(input:focus-visible) { outline: 3px solid var(--search); outline-offset: 2px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill:has(input:checked) { color: #062521; } }
+.pill:has(input:checked) { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+.pill:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
 .toolbar .count { color: var(--muted); font-size: .9rem; margin-left: auto; }
 
 ol.jobs { list-style: none; padding: 0; margin: 4px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
@@ -182,8 +209,8 @@ li.job:first-child { border-top: 0; }
 .ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 5; }
 .ring .track { stroke: var(--line); }
-.ring .val { stroke: var(--search); stroke-linecap: round; }
-.ring.mid .val { stroke: var(--fetch); } .ring.lo .val { stroke: var(--faint); }
+.ring .val { stroke: var(--ink); stroke-linecap: round; }
+.ring.mid .val { stroke: var(--muted); } .ring.lo .val { stroke: var(--faint); }
 .ring span { position: absolute; inset: 0; display: grid; place-items: center; font: 800 1.05rem var(--display); }
 .jt { font: 700 1.12rem/1.3 var(--display); margin: 0; }
 .jt a { color: var(--ink); text-decoration: none; }
@@ -196,10 +223,10 @@ li.job:first-child { border-top: 0; }
 .loc { display: inline-flex; align-items: center; gap: 5px; }
 .loc svg { width: 14px; height: 14px; flex: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.chip { font-size: .8rem; padding: 3px 10px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); white-space: nowrap; }
+.chip { font-size: .8rem; padding: 3px 10px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); white-space: nowrap; }
 .chip.new { background: var(--new); color: var(--new-ink); border-color: var(--new); font-weight: 700; }
 .chip.visa-yes, .chip.visa-opt { background: var(--good-soft); color: var(--good); border-color: transparent; }
-.chip.visa-no { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+.chip.visa-no { background: var(--panel); color: var(--ink); border: 1.5px dashed var(--ink); font-weight: 700; }
 .chip.src-search { background: var(--search-soft); color: var(--search); border-color: transparent; font-weight: 700; }
 .chip.src-fetch { background: var(--fetch-soft); color: var(--fetch); border-color: transparent; font-weight: 700; }
 .chip.src-agent { background: var(--agent-soft); color: var(--agent); border-color: transparent; font-weight: 700; }
@@ -208,7 +235,7 @@ li.job:first-child { border-top: 0; }
 .job details summary { cursor: pointer; width: fit-content; }
 .job details p { margin: 6px 0 0; }
 .apply a { display: inline-block; font-weight: 700; padding: 9px 18px; border-radius: 12px; background: var(--ink); color: var(--panel); text-decoration: none; white-space: nowrap; }
-.apply a:hover { background: var(--search); }
+.apply a:hover { background: var(--accent); color: var(--accent-ink); }
 
 .empty { padding: 30px 24px; max-width: 42em; background: var(--panel); border: 1px dashed var(--line); border-radius: 20px; margin-top: 4px; }
 .empty h3 { font: 700 1.2rem var(--display); margin: 0 0 6px; }
@@ -225,7 +252,7 @@ li.job:first-child { border-top: 0; }
 .badge.fetch { background: var(--fetch-soft); color: var(--fetch); }
 .badge.agent { background: var(--agent-soft); color: var(--agent); }
 .filtered { color: var(--muted); font-size: .9rem; margin: 12px 0 0; }
-.warnings { color: var(--bad); font-size: .9rem; padding-left: 18px; }
+.warnings { color: var(--ink); font-size: .9rem; list-style: none; padding-left: 0; }
 .warnings li { margin-top: 4px; overflow-wrap: anywhere; }
 
 @media (max-width: 760px) {
@@ -237,14 +264,14 @@ li.job:first-child { border-top: 0; }
 }
 @media (prefers-reduced-motion: no-preference) {
   li.job.fresh { animation: arrive .7s ease-out both; }
-  @keyframes arrive { from { background: var(--new); } to { background: transparent; } }
+  @keyframes arrive { from { background: var(--agent-soft); } to { background: transparent; } }
 }
 </style>
 </head>
 <body>
 <header class="top">
   <a class="brand" href="/">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="14" cy="16" rx="10" ry="7" fill="var(--search)"/><path d="M23 16l7-6v12z" fill="var(--search)"/><circle cx="9" cy="14" r="1.6" fill="var(--panel)"/></svg>
+    <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="14" cy="16" rx="10" ry="7" fill="var(--brand)"/><path d="M23 16l7-6v12z" fill="var(--brand)"/><circle cx="9" cy="14" r="1.6" fill="var(--panel)"/></svg>
     Job finder
   </a>
   <span class="keystate" id="keystate"><span class="dot" aria-hidden="true"></span><span id="keytext">Checking setup</span></span>
@@ -268,7 +295,7 @@ li.job:first-child { border-top: 0; }
           <option value="manager">manager</option>
         </select>
         level in
-        <label class="sr" for="locations">Locations, separated by semicolons</label><input id="locations" name="locations" placeholder="London; Remote">,
+        <label class="sr" for="locations">Locations, separated by semicolons</label><input id="locations" name="locations" placeholder="London">,
         and I
         <label class="sr" for="visa">Visa sponsorship</label>
         <select id="visa" name="visa">
@@ -278,38 +305,12 @@ li.job:first-child { border-top: 0; }
         visa sponsorship.
       </p>
 
-      <div class="actions">
-        <button class="primary" id="go" type="submit">Find jobs</button>
-        <button class="ghost" id="save" type="button">Save this search</button>
-        <button class="quiet" id="moreBtn" type="button" aria-expanded="false" aria-controls="more">More options</button>
-      </div>
-
-      <div class="drawer" id="more" hidden>
-        <fieldset>
-          <legend>Companies</legend>
-          <div class="field">
-            <label for="companies">Companies to always check</label>
-            <textarea id="companies" placeholder="Stripe&#10;Figma&#10;https://careers.example.com"></textarea>
-            <div class="hint">One per line, as names or careers page links.</div>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Ranking</legend>
-          <div class="field">
-            <label for="keywords">Words that rank a job higher</label>
-            <input id="keywords" placeholder="python, payments">
-          </div>
-          <div class="field">
-            <label for="exclude">Hide jobs that mention</label>
-            <input id="exclude" placeholder="clearance, unpaid">
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Place and time</legend>
-          <div class="field">
-            <label for="country">Search country</label>
-            <select id="country">
-            <option value="">Automatic</option>
+      <div class="remote-row">
+        <label class="toggle"><input type="checkbox" id="remote"><span>Remote jobs</span></label>
+        <label class="remote-label" for="remoteCountry" id="remoteLabel">open to</label>
+        <select class="remote-select" id="remoteCountry">
+          <option value="">my city's country</option>
+            <option value="ANY">anywhere</option>
             <option value="AR">Argentina</option>
             <option value="AU">Australia</option>
             <option value="AT">Austria</option>
@@ -368,9 +369,37 @@ li.job:first-child { border-top: 0; }
             <option value="US">United States</option>
             <option value="UY">Uruguay</option>
             <option value="VN">Vietnam</option>
-            </select>
-            <div class="hint">Each city you type is searched in its own country. This is for remote jobs and cities the app does not know.</div>
+        </select>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="go" type="submit">Find jobs</button>
+        <button class="ghost" id="save" type="button">Save this search</button>
+        <button class="quiet" id="moreBtn" type="button" aria-expanded="false" aria-controls="more">More options</button>
+      </div>
+
+      <div class="drawer" id="more" hidden>
+        <fieldset>
+          <legend>Companies</legend>
+          <div class="field">
+            <label for="companies">Companies to always check</label>
+            <textarea id="companies" placeholder="Stripe&#10;Figma&#10;https://careers.example.com"></textarea>
+            <div class="hint">One per line, as names or careers page links.</div>
           </div>
+        </fieldset>
+        <fieldset>
+          <legend>Ranking</legend>
+          <div class="field">
+            <label for="keywords">Words that rank a job higher</label>
+            <input id="keywords" placeholder="python, payments">
+          </div>
+          <div class="field">
+            <label for="exclude">Hide jobs that mention</label>
+            <input id="exclude" placeholder="clearance, unpaid">
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Freshness</legend>
           <div class="field">
             <label for="days">Posted within</label>
             <select id="days">
@@ -480,20 +509,26 @@ li.job:first-child { border-top: 0; }
     return {
       role: $('role').value.trim(), seniority: $('seniority').value, locations: $('locations').value, visa: $('visa').value,
       hideNoSponsor: $('hideNo').checked, companies: $('companies').value, keywords: $('keywords').value, exclude: $('exclude').value,
-      country: $('country').value, postedWithinDays: Number($('days').value), maxAgentRuns: Number($('agents').value), discover: $('discover').checked,
+      remoteOk: $('remote').checked, remoteCountry: $('remoteCountry').value, postedWithinDays: Number($('days').value), maxAgentRuns: Number($('agents').value), discover: $('discover').checked,
     };
   }
   function writePrefs(p) {
     const join = (v, sep) => Array.isArray(v) ? v.join(sep) : (v || '');
     $('role').value = p.role || '';
     $('seniority').value = p.seniority || 'any';
-    $('locations').value = join(p.locations, '; ');
+    // Older searches typed "Remote" into the locations: move it to the switch.
+    const locs = (Array.isArray(p.locations) ? p.locations : String(p.locations || '').split(/[;\n|]/)).map((x) => x.trim()).filter(Boolean);
+    const typedRemote = locs.some((x) => /^remote\b/i.test(x));
+    $('locations').value = locs.filter((x) => !/^remote\b/i.test(x)).join('; ');
+    $('remote').checked = !!p.remoteOk || typedRemote;
+    $('remoteCountry').value = p.remoteCountry !== undefined ? p.remoteCountry : (p.country || '');
+    if ($('remoteCountry').selectedIndex < 0) $('remoteCountry').value = '';
+    syncRemote();
     $('visa').value = p.visa || 'any';
     $('hideNo').checked = p.hideNoSponsor !== false;
     $('companies').value = join(p.companies, '\n');
     $('keywords').value = join(p.keywords, ', ');
     $('exclude').value = join(p.exclude, ', ');
-    $('country').value = p.country || '';
     $('days').value = String(p.postedWithinDays ?? 30);
     $('agents').value = String(p.maxAgentRuns ?? 2);
     $('discover').checked = p.discover !== false;
@@ -511,9 +546,18 @@ li.job:first-child { border-top: 0; }
   function sizeFields() {
     for (const id of ['role', 'locations']) { const i = $(id); fitWidth(i, i.value || i.placeholder); }
     for (const id of ['seniority', 'visa']) { const s = $(id); fitWidth(s, s.options[s.selectedIndex].text); }
+    const rc = $('remoteCountry');
+    if (rc.selectedIndex >= 0) fitWidth(rc, rc.options[rc.selectedIndex].text, 28); // room for the arrow
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(sizeFields);
   ['role', 'locations'].forEach((id) => $(id).addEventListener('input', sizeFields));
+  function syncRemote() {
+    const on = $('remote').checked;
+    $('remoteCountry').disabled = !on;
+    $('remoteLabel').classList.toggle('off', !on);
+  }
+  $('remote').addEventListener('change', syncRemote);
+  $('remoteCountry').addEventListener('change', sizeFields);
   ['seniority', 'visa'].forEach((id) => $(id).addEventListener('change', sizeFields));
   $('moreBtn').addEventListener('click', () => {
     const open = $('more').hidden;
@@ -867,6 +911,7 @@ li.job:first-child { border-top: 0; }
     } catch { $('keytext').textContent = 'Server not reachable'; $('keystate').classList.add('bad'); }
     try { const last = JSON.parse(localStorage.getItem('jf-last') || 'null'); if (last) writePrefs(last); } catch {}
     sizeFields();
+    syncRemote();
     loadSaved();
   })();
 })();
