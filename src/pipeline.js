@@ -130,9 +130,11 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   }
   matched.sort((a, b) => b.e.score - a.e.score || String(b.l.postedAt || '').localeCompare(String(a.l.postedAt || '')));
 
+  const stopped = tf.stopped;
   let seen;
   try {
-    seen = store.markSeen(searchId, matched.map(({ l }) => l.key));
+    const keys = matched.map(({ l }) => l.key);
+    seen = stopped ? store.peekSeen(searchId, keys) : store.markSeen(searchId, keys);
   } catch (err) {
     warnings.push(`Could not save which jobs you have seen, so nothing is marked new this time: ${err.message}`);
     seen = { firstRun: true, isNew: () => false, firstSeen: () => null };
@@ -163,7 +165,14 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
     firstSeen: seen.firstSeen(l.key),
   }));
 
+  if (stopped) {
+    // Requests that ended because of the stop are not problems to report.
+    const kept = warnings.filter((w) => !/Stopped by you/.test(w));
+    warnings.length = 0;
+    warnings.push('You stopped this search, so these results only include what was read before that.', ...kept);
+  }
   const result = {
+    stopped,
     searchId,
     prefs: p,
     roleNote,

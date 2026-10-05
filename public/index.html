@@ -114,8 +114,11 @@ h2.section { font: 700 1.2rem var(--display); margin: 0 0 12px; }
 
 /* Pipeline: the four steps of a search */
 .run { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 20px clamp(16px, 3vw, 26px) 16px; }
-.run-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
-.run-head h2 { font: 700 1.2rem var(--display); margin: 0; }
+.run-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+button.stop { padding: 7px 16px; border-radius: 10px; background: var(--panel); color: var(--bad); border: 1.5px solid var(--bad); font-size: .925rem; }
+button.stop:hover { background: var(--bad-soft); }
+button.stop:disabled { color: var(--muted); border-color: var(--line); background: var(--panel); }
+.run-head h2 { font: 700 1.2rem var(--display); margin: 0 auto 0 0; }
 .run-head .sub { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
 .pipeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
 .station { position: relative; padding: 0 14px 4px 0; }
@@ -403,7 +406,11 @@ li.job:first-child { border-top: 0; }
   </section>
 
   <section class="run" id="progress" hidden aria-live="polite">
-    <div class="run-head"><h2 id="progressTitle">Searching</h2><span class="sub" id="runTime"></span></div>
+    <div class="run-head">
+      <h2 id="progressTitle">Searching</h2>
+      <span class="sub" id="runTime"></span>
+      <button class="stop" id="stop" type="button" hidden>Stop search</button>
+    </div>
     <ol class="pipeline">
       <li class="station" data-stage="search"><span class="num">1</span><h3>Search</h3><p class="stat">Waiting</p><p class="sub">Finds company job boards</p><p class="live"></p></li>
       <li class="station" data-stage="fetch"><span class="num">2</span><h3>Fetch</h3><p class="stat">Waiting</p><p class="sub">Reads boards and postings</p><p class="live"></p></li>
@@ -587,9 +594,13 @@ li.job:first-child { border-top: 0; }
     const u = r.usage;
     const c = r.counts;
     setStation('search', 'done', plural(u.search.calls, 'query'), `${plural(r.boards.length + r.agentSites.length, 'careers page')} found`);
-    setStation('fetch', 'done', `${plural(u.fetch.urls, 'page')} read`, `${plural(c.collected, 'job')} collected${u.fetch.failed ? `, ${u.fetch.failed} pages could not be read` : ''}`);
+    // After a stop, some reads were cut off on purpose, so the failure count would mislead.
+    setStation('fetch', 'done', `${plural(u.fetch.urls, 'page')} read`, `${plural(c.collected, 'job')} collected${u.fetch.failed && !r.stopped ? `, ${u.fetch.failed} pages could not be read` : ''}`);
     const ran = u.agent.runs + u.agent.cached;
-    if (ran) setStation('agent', 'done', `${plural(ran, 'site')} browsed`, u.agent.cached ? `${u.agent.cached} reused from earlier, no credits` : `${u.agent.steps || 0} steps in total`);
+    const finished = r.agentSites.filter((a) => a.status === 'done' || a.status === 'cached').length;
+    const stoppedRuns = r.agentSites.filter((a) => a.status === 'stopped').length;
+    if (stoppedRuns) setStation('agent', finished ? 'done' : 'skipped', finished ? `${plural(finished, 'site')} browsed` : 'Stopped', `${plural(stoppedRuns, 'site')} stopped by you`);
+    else if (ran) setStation('agent', 'done', `${plural(ran, 'site')} browsed`, u.agent.cached ? `${u.agent.cached} reused from earlier, no credits` : `${u.agent.steps || 0} steps in total`);
     else setStation('agent', 'skipped', 'Not needed', 'Fetch read every site');
     setStation('match', 'done', plural(c.matched, 'match'), `from ${plural(c.unique, 'unique job')}`);
   }
@@ -606,10 +617,15 @@ li.job:first-child { border-top: 0; }
     resetPipeline();
     state.logSeen = 0;
     state.startedAt = Date.now();
+    state.taskId = null;
+    $('stop').hidden = false;
+    $('stop').disabled = true; // enabled once the server has started the search
+    $('stop').textContent = 'Stop search';
     $('progress').scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const { taskId } = await api(path, { method: 'POST', body: JSON.stringify(body) });
       state.taskId = taskId;
+      $('stop').disabled = false;
       poll();
     } catch (err) {
       showError(err.message);
@@ -619,8 +635,17 @@ li.job:first-child { border-top: 0; }
   function done() {
     $('go').disabled = false;
     $('go').textContent = 'Find jobs';
+    $('stop').hidden = true;
     clearTimeout(state.timer);
   }
+  $('stop').addEventListener('click', async () => {
+    if (!state.taskId) return;
+    $('stop').disabled = true;
+    $('stop').textContent = 'Stopping';
+    $('progressTitle').textContent = 'Stopping';
+    try { await api(`/api/task/${state.taskId}/stop`, { method: 'POST' }); }
+    catch (err) { showError(err.message); }
+  });
   async function poll() {
     try {
       const t = await api(`/api/task/${state.taskId}?since=${state.logSeen}`);
@@ -636,7 +661,7 @@ li.job:first-child { border-top: 0; }
       if (t.status === 'running') { state.timer = setTimeout(poll, 1200); return; }
       done();
       if (t.status === 'error') { $('progressTitle').textContent = 'Search stopped'; showError(t.error); return; }
-      $('progressTitle').textContent = 'Search finished';
+      $('progressTitle').textContent = t.result.stopped ? 'Search stopped' : 'Search finished';
       $('runTime').textContent = `${Math.round(t.result.durationMs / 1000)}s`;
       finishPipeline(t.result);
       render(t.result, true);
@@ -658,9 +683,11 @@ li.job:first-child { border-top: 0; }
     $('summary').textContent = c.matched
       ? `${plural(c.matched, 'match')} at ${plural(companies, 'company')}, from ${plural(c.unique, 'open job')}`
       : `No matches in ${plural(c.unique, 'open job')}`;
-    $('summarySub').textContent = r.firstRun
-      ? 'First run of this search. Next time, new jobs get a New label.'
-      : `${plural(c.newSinceLastRun, 'new job')} since your last run.`;
+    $('summarySub').textContent = r.stopped
+      ? 'You stopped this search early, so this only includes what was read before that.'
+      : r.firstRun
+        ? 'First run of this search. Next time, new jobs get a New label.'
+        : `${plural(c.newSinceLastRun, 'new job')} since your last run.`;
     if (!fresh) finishPipeline(r);
     renderJobs(fresh);
     renderSources(r);

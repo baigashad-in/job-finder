@@ -91,6 +91,24 @@ test('a failed cache save does not fail the Agent run', async (t) => {
   assert.ok(logs.some((m) => /Could not save the Agent cache/.test(m)));
 });
 
+test('stopping cancels a running Agent run without waiting for the next poll', async (t) => {
+  const mock = await startMock();
+  t.after(() => mock.server.close());
+  mock.st.runDelayMs = 60000;
+  process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
+  const { TinyFish } = require('../src/tinyfish');
+  const ctrl = new AbortController();
+  const tf = new TinyFish({ apiKey: 'test-key', signal: ctrl.signal });
+  setTimeout(() => ctrl.abort(), 200);
+  const started = Date.now();
+  const run = await tf.agentRun({ url: 'https://careers.vandelay.com/jobs', goal: 'x' }, { maxWaitMs: 60000, pollMs: 5000 });
+  assert.equal(run.status, 'CANCELLED');
+  assert.equal(run.error.message, 'Stopped by you');
+  assert.equal(mock.st.calls.cancel, 1, 'the run was cancelled on TinyFish');
+  assert.ok(Date.now() - started < 2000, 'did not wait for the 5 second poll');
+  await assert.rejects(tf.search({ query: 'x' }), /Stopped by you/, 'no new requests after a stop');
+});
+
 test('a bad API key gives a clear error', async (t) => {
   const mock = await startMock();
   t.after(() => mock.server.close());

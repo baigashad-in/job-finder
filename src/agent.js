@@ -178,6 +178,10 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
         return toListings(cached, t);
       }
     }
+    if (tf.stopped) {
+      report.push({ company: t.company, url: t.url, ats: t.ats, status: 'stopped', jobs: 0 });
+      return [];
+    }
     // Two failures and no success usually means this kind of site does not work today.
     // Stop starting new runs instead of spending credits on the rest.
     if (failures >= 2 && successes === 0) {
@@ -196,15 +200,23 @@ async function runAgents(targets, p, tf, log, warnings, force, store) {
         onStream,
       });
       parsed = parseAgentResult(run);
-      if (parsed.blocked && STEALTH_RETRY) {
+      if (parsed.blocked && STEALTH_RETRY && !tf.stopped) {
         log('agent', `${t.company}: blocked, retrying once in stealth mode`);
         run = await tf.agentRun(runBody(t, goal, true, p.country), { maxWaitMs: MAX_WAIT_MS, onStream });
         parsed = parseAgentResult(run);
       }
     } catch (err) {
+      if (tf.stopped) {
+        report.push({ company: t.company, url: t.url, ats: t.ats, status: 'stopped', jobs: 0 });
+        return [];
+      }
       failures++;
       warnings.push(`Agent could not read ${t.company} (${host}): ${err.message}`);
       report.push({ company: t.company, url: t.url, ats: t.ats, status: 'error', jobs: 0 });
+      return [];
+    }
+    if (tf.stopped && run.status !== 'COMPLETED') {
+      report.push({ company: t.company, url: t.url, ats: t.ats, status: 'stopped', jobs: 0 });
       return [];
     }
     if (run.status !== 'COMPLETED' || parsed.blocked) {

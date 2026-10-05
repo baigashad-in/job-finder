@@ -8,7 +8,6 @@
 
 
 const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class TinyFishError extends Error {
   constructor(message, status, body) {
@@ -19,7 +18,10 @@ class TinyFishError extends Error {
 }
 
 class TinyFish {
-  constructor({ apiKey, log } = {}) {
+  // signal: an AbortSignal. When it fires, requests end at once, no new ones start, and
+  // running Agent runs are cancelled on TinyFish so they stop using credits.
+  constructor({ apiKey, log, signal } = {}) {
+    this.signal = signal || null;
     this.apiKey = apiKey || process.env.TINYFISH_API_KEY;
     if (!this.apiKey) throw new Error('TINYFISH_API_KEY is not set');
     this.log = log || (() => {});
@@ -33,11 +35,28 @@ class TinyFish {
     };
   }
 
-  async _request(url, { method = 'GET', body, timeoutMs = 30000, retries = 2 } = {}) {
+  get stopped() { return !!(this.signal && this.signal.aborted); }
+
+  // Waits ms, or less if the search is stopped.
+  _sleep(ms) {
+    if (this.stopped) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => { clearTimeout(t); if (this.signal) this.signal.removeEventListener('abort', done); resolve(); };
+      const t = setTimeout(done, ms);
+      if (this.signal) this.signal.addEventListener('abort', done, { once: true });
+    });
+  }
+
+  // ignoreStop: still send this request after a stop (used to cancel Agent runs).
+  async _request(url, { method = 'GET', body, timeoutMs = 30000, retries = 2, ignoreStop = false } = {}) {
     let attempt = 0;
+    const watchStop = !ignoreStop && this.signal;
     for (;;) {
+      if (watchStop && this.stopped) throw new TinyFishError('Stopped by you', 0);
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const onStop = () => ctrl.abort();
+      if (watchStop) this.signal.addEventListener('abort', onStop, { once: true });
       let res;
       try {
         res = await fetch(url, {
@@ -51,15 +70,18 @@ class TinyFish {
         });
       } catch (err) {
         clearTimeout(timer);
+        if (watchStop) this.signal.removeEventListener('abort', onStop);
+        if (watchStop && this.stopped) throw new TinyFishError('Stopped by you', 0);
         if (attempt < retries) {
           attempt++;
-          await sleep(800 * attempt);
+          await this._sleep(800 * attempt);
           continue;
         }
         const reason = err.name === 'AbortError' ? `timed out after ${timeoutMs} ms` : err.message;
         throw new TinyFishError(`${method} ${url} failed: ${reason}`, 0);
       }
       clearTimeout(timer);
+      if (watchStop) this.signal.removeEventListener('abort', onStop);
       const text = await res.text();
       let json = null;
       try { json = text ? JSON.parse(text) : null; } catch { /* non JSON body */ }
@@ -69,7 +91,7 @@ class TinyFish {
         const ra = Number(res.headers.get('retry-after'));
         const wait = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 15000) : 1500 * attempt;
         this.log(`TinyFish returned ${res.status}, retrying in ${Math.round(wait / 1000)}s`);
-        await sleep(wait);
+        await this._sleep(wait);
         continue;
       }
       const msg = (json && (json.message || json.error?.message || json.error)) || text.slice(0, 200);
@@ -143,13 +165,15 @@ class TinyFish {
     let lastStatus = '';
     let streamSent = false;
     for (;;) {
-      await sleep(pollMs);
+      await this._sleep(pollMs);
+      if (this.stopped) break;
       const now = Date.now();
       if (runningSince === null ? now - queuedAt > maxPendingMs : now - runningSince > maxWaitMs) break;
       let run;
       try {
         run = await this._request(`${this.agentUrl}/v1/runs/${encodeURIComponent(runId)}`, { timeoutMs: 20000 });
       } catch (err) {
+        if (this.stopped) break;
         this.log(`Polling run ${runId} failed once: ${err.message}`);
         continue;
       }
@@ -171,10 +195,11 @@ class TinyFish {
       }
     }
     try {
-      await this._request(`${this.agentUrl}/v1/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', timeoutMs: 15000, retries: 0 });
+      // Sent even after a stop: this is what makes the run stop using credits.
+      await this._request(`${this.agentUrl}/v1/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', timeoutMs: 15000, retries: 0, ignoreStop: true });
     } catch { /* best effort */ }
     this.stats.agent.failed++;
-    const why = runningSince === null
+    const why = this.stopped ? 'Stopped by you' : runningSince === null
       ? `Still queued after ${Math.round(maxPendingMs / 1000)}s`
       : `Stopped after ${Math.round(maxWaitMs / 1000)}s`;
     return { run_id: runId, status: 'CANCELLED', result: null, error: { message: why } };

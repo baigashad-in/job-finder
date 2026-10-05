@@ -107,6 +107,14 @@ module.exports = {
     return { firstRun, isNew: (k) => !firstRun && fresh.has(k), firstSeen: (k) => prev[k] };
   },
 
+  // Same answers as markSeen, without saving. A stopped search only read part of the
+  // boards, so saving would make the next full search call jobs "new" that are not.
+  peekSeen(searchId, keys) {
+    const prev = readJson(files.seen(), {})[searchId] || {};
+    const firstRun = Object.keys(prev).length === 0;
+    return { firstRun, isNew: (k) => !firstRun && !prev[k], firstSeen: (k) => prev[k] || null };
+  },
+
   getAgentCache(key, maxAgeHours) {
     const all = readJson(files.agent(), {});
     const hit = all[key];

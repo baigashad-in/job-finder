@@ -244,3 +244,40 @@ test('HTTP API runs a search and serves results', async (t) => {
   const latest = await fetch(`${base}/api/searches/${list[0].id}/latest`);
   assert.equal(latest.status, 200, 'latest result exists because the same prefs already ran');
 });
+
+test('Stop ends a search early, cancels Agent runs and keeps what was read', async (t) => {
+  const mock = await startMock();
+  mock.st.runDelayMs = 60000; // Agent runs never finish by themselves
+  process.env.TINYFISH_SEARCH_URL = `http://127.0.0.1:${mock.port}/search`;
+  process.env.TINYFISH_FETCH_URL = `http://127.0.0.1:${mock.port}/fetch`;
+  process.env.TINYFISH_AGENT_URL = `http://127.0.0.1:${mock.port}/agent`;
+  process.env.AGENT_POLL_MS = '50';
+  const { server } = require('../server');
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => { server.close(); mock.server.close(); });
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const post = (path, body) => fetch(`${base}${path}`, { method: 'POST', body: JSON.stringify(body || {}) });
+
+  const { taskId } = await (await post('/api/search', { prefs: PREFS, force: true })).json();
+  for (let i = 0; i < 200 && !mock.st.calls.agentStart.length; i++) await wait(25);
+  assert.ok(mock.st.calls.agentStart.length >= 1, 'an Agent run had started');
+  assert.equal((await post(`/api/task/${taskId}/stop`)).status, 202);
+
+  let task;
+  for (let i = 0; i < 200; i++) {
+    task = await (await fetch(`${base}/api/task/${taskId}`)).json();
+    if (task.status !== 'running') break;
+    await wait(50);
+  }
+  assert.equal(task.status, 'done');
+  const r = task.result;
+  assert.equal(r.stopped, true);
+  assert.match(r.warnings[0], /You stopped this search/);
+  assert.ok(!r.warnings.some((w) => /Stopped by you/.test(w)), 'no noise from requests the stop ended');
+  assert.ok(mock.st.calls.cancel >= 1, 'running Agent runs were cancelled on TinyFish');
+  assert.ok(mock.st.calls.agentStart.length < 3, 'no new Agent run started after the stop');
+  assert.ok(r.agentSites.some((a) => a.status === 'stopped'));
+  assert.ok(r.listings.length >= 1, 'jobs read before the stop are still shown');
+  assert.equal((await post(`/api/task/${taskId}/stop`)).status, 409, 'a finished search cannot be stopped');
+});

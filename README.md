@@ -154,6 +154,10 @@ Every job gets points for each of these, and some rules remove a job completely.
 
 Below the results, the app tells you how many jobs were removed for each reason, so an empty result explains itself ("location (120)") and suggests what to change.
 
+## Stopping a search
+
+**Stop search** (next to the progress steps) ends a search early. No new requests or Agent runs start, Agent runs that are going are cancelled on TinyFish so they stop using credits, and the jobs already read are still matched and shown with a note. A stopped search does not change "new since last run" or a saved search's last results. In the command line version, the first `Ctrl+C` does the same, and a second one quits at once.
+
 ## Keeping results fresh
 
 * **New since last run.** The app remembers which jobs each search has shown. On later runs, jobs it has not seen before get a **New** label and a **New only** filter.
@@ -166,7 +170,7 @@ Below the results, the app tells you how many jobs were removed for each reason,
 npm test
 ```
 
-55 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
+57 tests, no network needed. `test/mock-tinyfish.js` is a fake TinyFish server used only by the tests. It copies the documented request and response shapes, rejects Agent requests that TinyFish or the official SDK would reject (unsupported `output_schema` keywords, extra `proxy_config` fields, beta-only `max_steps`), and serves fixture data for fictional companies. The app itself never loads it; every real run reads live pages through TinyFish.
 
 The end-to-end test checks that a full run uses all three APIs, returns exactly the expected matches with the right removal reasons, merges a posting found by both Search and Agent, retries in stealth only for a blocked site, reports a live browser link for each Agent run, respects `AGENT_RUNS_LIMIT`, reads Workday through Fetch before using the Agent, does not count queue time against the run limit, spends zero Agent credits on a repeat run, flags a newly posted job as new, and still works with Agent turned off.
 

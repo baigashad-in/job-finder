@@ -15,7 +15,7 @@ const store = require('./src/store');
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '127.0.0.1';
 const REFRESH_HOURS = Number(process.env.REFRESH_HOURS || 0);
-const VERSION = '14.0.0';
+const VERSION = '15.0.0';
 const INDEX = path.join(__dirname, 'public', 'index.html');
 
 const tasks = new Map(); // id -> { status, log, result, error, startedAt }
@@ -48,7 +48,8 @@ function startTask(prefs, { force = false, label = 'search' } = {}) {
   if (running >= 2) throw Object.assign(new Error('Two searches are already running. Wait for one to finish.'), { code: 429 });
   normalizePrefs(prefs); // validate early so the user sees input errors immediately
   const id = crypto.randomBytes(6).toString('hex');
-  const task = { id, label, status: 'running', log: [], result: null, error: null, startedAt: Date.now() };
+  const controller = new AbortController();
+  const task = { id, label, status: 'running', log: [], result: null, error: null, startedAt: Date.now(), controller };
   tasks.set(id, task);
   const log = (kind, msg, extra) => {
     task.log.push({ t: Date.now() - task.startedAt, kind, msg, link: extra && extra.link ? String(extra.link) : undefined });
@@ -56,11 +57,14 @@ function startTask(prefs, { force = false, label = 'search' } = {}) {
   };
   (async () => {
     try {
-      const tf = new TinyFish({ log: (m) => log('warn', m) });
+      const tf = new TinyFish({ log: (m) => log('warn', m), signal: controller.signal });
       const result = await runPipeline(prefs, { tf, store, log, force });
       try {
-        store.saveLatest(result.searchId, result);
-        store.touchSearch(result.searchId, { matched: result.counts.matched, fresh: result.counts.newSinceLastRun });
+        // A stopped search is partial, so it does not replace a saved search's last results.
+        if (!result.stopped) {
+          store.saveLatest(result.searchId, result);
+          store.touchSearch(result.searchId, { matched: result.counts.matched, fresh: result.counts.newSinceLastRun });
+        }
       } catch (err) {
         log('warn', `Results are shown but could not be saved: ${err.message}`);
       }
@@ -112,6 +116,16 @@ const server = http.createServer(async (req, res) => {
       if (!process.env.TINYFISH_API_KEY) return json(res, 400, { error: 'Set TINYFISH_API_KEY before starting the server.' });
       const body = await readBody(req);
       return json(res, 202, { taskId: startTask(body.prefs || {}, { force: !!body.force }) });
+    }
+    if (req.method === 'POST' && parts[1] === 'task' && parts[2] && parts[3] === 'stop') {
+      const t = tasks.get(parts[2]);
+      if (!t) return json(res, 404, { error: 'Task not found or expired' });
+      if (t.status !== 'running') return json(res, 409, { error: 'This search has already finished' });
+      if (!t.controller.signal.aborted) {
+        t.log.push({ t: Date.now() - t.startedAt, kind: 'step', msg: 'Stopping: no new requests, and running Agent runs are being cancelled' });
+        t.controller.abort();
+      }
+      return json(res, 202, { ok: true });
     }
     if (req.method === 'GET' && parts[1] === 'task' && parts[2]) {
       const t = tasks.get(parts[2]);

@@ -36,7 +36,15 @@ async function main() {
     companies: a.companies || '', postedWithinDays: a.days || 30, maxAgentRuns: a.agents ?? 2,
     discover: !a['no-discover'],
   };
-  const tf = new TinyFish({ log: (m) => console.error(`  ! ${m}`) });
+  // First Ctrl+C stops the search the same way the Stop button does: running Agent runs are
+  // cancelled on TinyFish and the jobs read so far are still shown. A second Ctrl+C quits.
+  const controller = new AbortController();
+  process.on('SIGINT', () => {
+    if (controller.signal.aborted) process.exit(130);
+    console.error('\nStopping: cancelling running Agent runs and showing what was read. Press Ctrl+C again to quit at once.');
+    controller.abort();
+  });
+  const tf = new TinyFish({ log: (m) => console.error(`  ! ${m}`), signal: controller.signal });
   const r = await runPipeline(prefs, { tf, store, force: !!a.refresh, log: (k, m, x) => console.error(`[${k}] ${m}${x && x.link ? ` ${x.link}` : ''}`) });
   const top = Number(a.top || 25);
   console.log('');

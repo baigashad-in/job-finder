@@ -1,6 +1,6 @@
 {
   "name": "job-finder",
-  "version": "14.0.0",
+  "version": "15.0.0",
   "description": "Job and internship finder that reads live careers pages with TinyFish Search, Fetch and Agent, then matches, dedupes and ranks openings.",
   "main": "server.js",
   "bin": { "job-finder": "cli.js" },
