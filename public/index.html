@@ -4,15 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Job finder</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐟</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><ellipse cx='14' cy='16' rx='10' ry='7' fill='%230B6B63'/><path d='M23 16l7-6v12z' fill='%230B6B63'/><circle cx='9' cy='14' r='1.6' fill='white'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --paper: #F6F6F2; --panel: #FFFFFF; --ink: #1D2430; --muted: #5E6672; --line: #DCDDD5;
-  --accent: #0F6E66; --accent-ink: #FFFFFF; --accent-soft: #DCEFEC; --new: #F2C14E; --new-ink: #3A2C00;
-  --bad: #A8432A; --bad-soft: #F6E3DC; --good: #2D6A3E; --good-soft: #E0EFE3;
+  --paper: #F3F5F2; --panel: #FFFFFF; --ink: #16202B; --muted: #5B6670; --faint: #8A939B; --line: #DDE2DC;
+  --hero: #E3EEE9; --slot: #FFFFFF; --slot-line: #B9D3CA;
+  --search: #0B6B63; --search-soft: #DCEFEA;
+  --fetch: #4A55C9; --fetch-soft: #E5E7FA;
+  --agent: #B7791F; --agent-soft: #F8ECD6;
+  --new: #F2B33D; --new-ink: #3B2A00;
+  --good: #2D6A3E; --good-soft: #E0EFE3; --bad: #A5402A; --bad-soft: #F6E2DB;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   color-scheme: light dark;
@@ -21,177 +25,288 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #15191E; --panel: #1C2128; --ink: #E7E9E4; --muted: #A2A9B2; --line: #313842;
-    --accent: #4FC1B4; --accent-ink: #062521; --accent-soft: #1D3633; --new: #E8B83A; --new-ink: #2A1F00;
-    --bad: #F0957B; --bad-soft: #3A2620; --good: #8FD3A0; --good-soft: #1F3326;
+    --paper: #12171D; --panel: #192028; --ink: #E8ECEF; --muted: #A3ADB6; --faint: #7C8791; --line: #2C3540;
+    --hero: #16282A; --slot: #1E2B2E; --slot-line: #2F4D49;
+    --search: #4CC2B3; --search-soft: #173430;
+    --fetch: #9AA3F5; --fetch-soft: #232849;
+    --agent: #E5B35A; --agent-soft: #3A2D16;
+    --new: #E8B83A; --new-ink: #2A1F00;
+    --good: #8FD3A0; --good-soft: #1E3326; --bad: #F0957B; --bad-soft: #3A2620;
   }
 }
 *, *::before, *::after { box-sizing: inherit; }
+[hidden] { display: none !important; }
 html { scroll-padding-top: env(safe-area-inset-top, 0px); }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--body); }
-a { color: var(--accent); }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+a { color: var(--search); }
+:focus-visible { outline: 3px solid var(--search); outline-offset: 2px; border-radius: 6px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px 72px; }
 
-header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 28px; }
-.brand { font: 600 1.05rem var(--display); }
-.keystate { font-size: .875rem; color: var(--muted); }
+/* Header */
+.top { max-width: 1120px; margin: 0 auto; padding: 20px 22px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 1.1rem var(--display); color: var(--ink); text-decoration: none; }
+.brand svg { width: 30px; height: 30px; }
+.keystate { display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; color: var(--muted); background: var(--panel); border: 1px solid var(--line); padding: 5px 12px; border-radius: 999px; }
+.keystate .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.keystate.ok .dot { background: var(--search); }
 .keystate.bad { color: var(--bad); }
+.keystate.bad .dot { background: var(--bad); }
 
-/* The sentence: the one bold element on the page */
-.sentence { font: 400 clamp(1.5rem, 3.6vw, 2.5rem)/1.45 var(--display); letter-spacing: -0.01em; margin: 0 0 18px; max-width: 30em; }
+/* Hero: the search as one sentence */
+.hero { background: var(--hero); border-radius: 22px; padding: clamp(24px, 4vw, 44px); }
+.sentence { font: 500 clamp(1.6rem, 3.6vw, 2.6rem)/1.5 var(--display); letter-spacing: -0.015em; margin: 0 0 22px; max-width: 26em; }
 .sentence input, .sentence select {
-  font: 600 1em var(--display); color: var(--accent); background: transparent; border: 0;
-  border-bottom: 2px solid var(--line); padding: 0 2px; margin: 0 2px; min-width: 4ch;
-  appearance: none; -webkit-appearance: none; border-radius: 0;
+  font: 700 1em/1.15 var(--display); letter-spacing: -0.015em; color: var(--search);
+  background: var(--slot); border: 1.5px solid var(--slot-line); border-radius: 12px;
+  padding: .02em .28em .06em; margin: .1em .08em; min-width: 3ch; vertical-align: baseline;
+  appearance: none; -webkit-appearance: none;
 }
-.sentence select { padding-right: 4px; cursor: pointer; }
-.sentence input:hover, .sentence select:hover { border-bottom-color: var(--accent); }
-.sentence input:focus, .sentence select:focus { outline: none; border-bottom-color: var(--accent); background: var(--accent-soft); }
-.sentence input::placeholder { color: var(--muted); opacity: .6; font-weight: 400; }
-#role { width: 11ch; } #locations { width: 13ch; }
-
-details.more { margin: 8px 0 18px; }
-details.more summary { cursor: pointer; color: var(--muted); font-size: .95rem; width: fit-content; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 20px; margin-top: 14px; max-width: 900px; }
-.field label { display: block; font-size: .875rem; font-weight: 700; margin-bottom: 4px; }
-.field .hint { font-size: .8rem; color: var(--muted); margin-top: 3px; }
-.field input, .field select, .field textarea {
-  width: 100%; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 6px; padding: 8px 10px;
+.sentence select {
+  cursor: pointer; padding-right: 1.05em;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%230B6B63' stroke-width='2'/></svg>");
+  background-repeat: no-repeat; background-position: right .3em center; background-size: .42em auto;
 }
-.field textarea { min-height: 84px; resize: vertical; }
-.check { display: flex; gap: 8px; align-items: center; font-size: .95rem; }
-.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.sentence input:hover, .sentence select:hover { border-color: var(--search); }
+.sentence input:focus, .sentence select:focus { outline: none; border-color: var(--search); box-shadow: 0 0 0 4px var(--search-soft); }
+.sentence input::placeholder { color: var(--faint); font-weight: 500; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-button { font: 700 1rem var(--body); border-radius: 6px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
-button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button:disabled { opacity: .55; cursor: progress; }
-button.link { border: 0; background: none; padding: 4px 6px; color: var(--accent); font-weight: 700; }
-.err { color: var(--bad); margin: 10px 0 0; }
+button { font: 700 1rem var(--body); border-radius: 12px; padding: 11px 20px; cursor: pointer; border: 1.5px solid transparent; color: var(--ink); }
+button.primary { background: var(--search); color: #fff; }
+button.primary:hover { filter: brightness(1.08); }
+button.ghost { background: var(--panel); border-color: var(--line); }
+button.ghost:hover { border-color: var(--search); }
+button.quiet { background: none; color: var(--search); padding: 11px 10px; }
+button:disabled { opacity: .6; cursor: progress; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) button.primary { color: #062521; } }
+.powered { margin: 18px 0 0; color: var(--muted); font-size: .9rem; }
+.err { color: var(--bad); margin: 12px 0 0; font-weight: 700; }
 
-.saved { margin: 30px 0 0; }
-.saved h2, .section h2 { font: 600 1.15rem var(--display); margin: 0 0 10px; }
+/* More options drawer */
+.drawer { margin-top: 22px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 760px) { .drawer { grid-template-columns: 1fr; } }
+.drawer fieldset { margin: 0; border: 1px solid var(--line); background: var(--panel); border-radius: 16px; padding: 14px 16px 16px; min-width: 0; }
+/* A floated legend sits inside the box instead of cutting into its border. */
+.drawer legend { float: left; width: 100%; font: 700 1.05rem var(--display); padding: 0; margin: 0 0 6px; }
+.drawer legend + * { clear: both; }
+.field { margin-top: 10px; }
+.field label { display: block; font-size: .875rem; font-weight: 700; margin-bottom: 5px; }
+.hint { font-size: .8rem; color: var(--muted); margin-top: 5px; }
+.field input, .field select, .field textarea {
+  width: 100%; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+}
+.field textarea { min-height: 96px; resize: vertical; }
+.switch { display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: .925rem; cursor: pointer; }
+.switch input { appearance: none; -webkit-appearance: none; flex: none; width: 36px; height: 20px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background .15s; }
+.switch input::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch input:checked { background: var(--search); }
+.switch input:checked::before { transform: translateX(16px); }
+
+/* Saved searches */
+.saved { margin-top: 30px; }
+h2.section { font: 700 1.2rem var(--display); margin: 0 0 12px; }
 .saved ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
-.saved li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 220px; }
+.saved li { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 230px; }
 .saved .name { font-weight: 700; }
-.saved .meta { font-size: .85rem; color: var(--muted); }
+.saved .meta { font-size: .85rem; color: var(--muted); margin: 2px 0 6px; }
+.saved button { padding: 4px 8px; font-size: .9rem; }
 
-.progress { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
-.progress h2 { font: 600 1.05rem var(--display); margin: 0 0 8px; }
-.progress ol { margin: 0; padding-left: 0; list-style: none; max-height: 240px; overflow: auto; font-size: .9rem; }
-.progress li { padding: 2px 0; color: var(--muted); }
-.progress li.step { color: var(--ink); font-weight: 700; margin-top: 6px; }
-.progress li.step .kind { display: none; }
-.progress li .kind { display: inline-block; min-width: 4.5em; font-weight: 700; color: var(--accent); }
-.progress li.warn .kind, .progress li.error .kind { color: var(--bad); }
+/* Pipeline: the four steps of a search */
+.run { margin-top: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 20px clamp(16px, 3vw, 26px) 16px; }
+.run-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.run-head h2 { font: 700 1.2rem var(--display); margin: 0; }
+.run-head .sub { color: var(--muted); font-size: .9rem; font-variant-numeric: tabular-nums; }
+.pipeline { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+.station { position: relative; padding: 0 14px 4px 0; }
+.station::after { content: ""; position: absolute; top: 17px; left: 44px; right: 14px; height: 2px; background: var(--line); }
+.station:last-child::after { display: none; }
+.station .num {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  font: 800 1rem var(--display); background: var(--paper); color: var(--faint); border: 2px solid var(--line);
+}
+.station h3 { font: 700 1.05rem var(--display); margin: 10px 0 0; }
+.station .stat { font: 700 1.25rem/1.25 var(--display); margin: 4px 0 2px; color: var(--faint); }
+.station .sub { font-size: .85rem; color: var(--muted); margin: 0; }
+.station .live { font-size: .85rem; color: var(--muted); margin: 6px 0 0; overflow-wrap: anywhere; }
+.station .watch { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+.station .watch a { font-weight: 700; color: var(--agent); }
+.station[data-stage="search"] { --c: var(--search); --cs: var(--search-soft); }
+.station[data-stage="fetch"] { --c: var(--fetch); --cs: var(--fetch-soft); }
+.station[data-stage="agent"] { --c: var(--agent); --cs: var(--agent-soft); }
+.station[data-stage="match"] { --c: var(--ink); --cs: var(--line); }
+.station.active .num, .station.done .num { border-color: var(--c); color: var(--c); background: var(--cs); }
+.station.done .num { background: var(--c); color: var(--panel); }
+.station.done::after { background: var(--c); }
+.station.active .stat, .station.done .stat { color: var(--c); }
+.station.skipped .stat { color: var(--faint); }
+@media (prefers-reduced-motion: no-preference) {
+  .station.active .num { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--cs); } 50% { box-shadow: 0 0 0 7px var(--cs); } }
+}
+details.log { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.log summary { cursor: pointer; color: var(--muted); font-size: .9rem; width: fit-content; }
+details.log ol { margin: 8px 0 0; padding: 0; list-style: none; max-height: 260px; overflow: auto; font-size: .875rem; }
+details.log li { padding: 2px 0; color: var(--muted); }
+details.log li.step { color: var(--ink); font-weight: 700; margin-top: 4px; }
+details.log .kind { display: inline-block; min-width: 4.6em; font-weight: 700; }
+details.log li.search .kind { color: var(--search); } details.log li.fetch .kind { color: var(--fetch); }
+details.log li.agent .kind { color: var(--agent); } details.log li.warn .kind, details.log li.error .kind { color: var(--bad); }
+details.log li.step .kind { display: none; }
 
-.summary { margin: 34px 0 6px; font: 400 1.2rem/1.4 var(--display); max-width: 46em; }
-.usage { color: var(--muted); font-size: .9rem; margin-bottom: 14px; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 2; }
-.toolbar input[type=search], .toolbar select { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
-.toolbar input[type=search] { min-width: 200px; flex: 1 1 200px; }
+/* Results */
+.results-head { margin: 34px 0 4px; }
+.results-head h2 { font: 700 clamp(1.35rem, 2.6vw, 1.75rem)/1.25 var(--display); letter-spacing: -0.01em; margin: 0; max-width: 34em; }
+.results-head p { color: var(--muted); margin: 6px 0 0; }
+.note { background: var(--agent-soft); border-radius: 12px; padding: 10px 14px; margin: 28px 0 0; font-size: .95rem; }
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; padding: 12px 0;
+  position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 3; border-bottom: 1px solid var(--line);
+}
+.toolbar input[type=search], .toolbar select { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); }
+.toolbar input[type=search] { flex: 1 1 270px; min-width: 0; }
+.pill { position: relative; display: inline-flex; align-items: center; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: .925rem; cursor: pointer; user-select: none; }
+.pill input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pill:has(input:checked) { background: var(--search); border-color: var(--search); color: #fff; }
+.pill:has(input:focus-visible) { outline: 3px solid var(--search); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill:has(input:checked) { color: #062521; } }
 .toolbar .count { color: var(--muted); font-size: .9rem; margin-left: auto; }
 
-ol.jobs { list-style: none; padding: 0; margin: 0; }
-li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: start; }
-.score { font: 800 2.1rem/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; display: flex; gap: 8px; align-items: stretch; }
-.score .meter { width: 5px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; min-height: 2.1rem; }
-.score .meter span { position: absolute; left: 0; right: 0; bottom: 0; background: currentColor; }
-.score.hi { color: var(--accent); } .score.mid { color: var(--ink); } .score.lo { color: var(--muted); }
-.jt { font: 600 1.15rem/1.3 var(--display); margin: 0; }
+ol.jobs { list-style: none; padding: 0; margin: 4px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+li.job { display: grid; grid-template-columns: 58px 1fr auto; gap: 4px 18px; padding: 18px 20px; border-top: 1px solid var(--line); align-items: start; }
+li.job:first-child { border-top: 0; }
+.ring { width: 52px; height: 52px; position: relative; }
+.ring svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 5; }
+.ring .track { stroke: var(--line); }
+.ring .val { stroke: var(--search); stroke-linecap: round; }
+.ring.mid .val { stroke: var(--fetch); } .ring.lo .val { stroke: var(--faint); }
+.ring span { position: absolute; inset: 0; display: grid; place-items: center; font: 800 1.05rem var(--display); }
+.jt { font: 700 1.12rem/1.3 var(--display); margin: 0; }
 .jt a { color: var(--ink); text-decoration: none; }
-.jt a:hover { text-decoration: underline; }
-.jm { color: var(--muted); margin-top: 2px; }
-.jm strong { color: var(--ink); font-weight: 700; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.chip { font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); white-space: nowrap; }
+.jt a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.jm { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 6px; color: var(--muted); font-size: .95rem; }
+.co { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; }
+.mono { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; font: 800 .8rem var(--display);
+  background: hsl(var(--h) 40% 88%); color: hsl(var(--h) 45% 26%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mono { background: hsl(var(--h) 25% 24%); color: hsl(var(--h) 50% 82%); } }
+.loc { display: inline-flex; align-items: center; gap: 5px; }
+.loc svg { width: 14px; height: 14px; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { font-size: .8rem; padding: 3px 10px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); white-space: nowrap; }
 .chip.new { background: var(--new); color: var(--new-ink); border-color: var(--new); font-weight: 700; }
 .chip.visa-yes, .chip.visa-opt { background: var(--good-soft); color: var(--good); border-color: transparent; }
 .chip.visa-no { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
-.why { font-size: .9rem; color: var(--muted); margin-top: 6px; }
+.chip.src-search { background: var(--search-soft); color: var(--search); border-color: transparent; font-weight: 700; }
+.chip.src-fetch { background: var(--fetch-soft); color: var(--fetch); border-color: transparent; font-weight: 700; }
+.chip.src-agent { background: var(--agent-soft); color: var(--agent); border-color: transparent; font-weight: 700; }
+.why { font-size: .9rem; color: var(--muted); margin-top: 8px; }
 .job details { font-size: .85rem; color: var(--muted); margin-top: 4px; }
 .job details summary { cursor: pointer; width: fit-content; }
-.apply { align-self: center; }
-.apply a { display: inline-block; font-weight: 700; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--accent); text-decoration: none; white-space: nowrap; }
-.apply a:hover { background: var(--accent); color: var(--accent-ink); }
+.job details p { margin: 6px 0 0; }
+.apply a { display: inline-block; font-weight: 700; padding: 9px 18px; border-radius: 12px; background: var(--ink); color: var(--panel); text-decoration: none; white-space: nowrap; }
+.apply a:hover { background: var(--search); }
 
-.empty { padding: 28px 0; max-width: 40em; }
-.section { margin-top: 36px; }
-.section table { border-collapse: collapse; width: 100%; font-size: .9rem; }
-.section th, .section td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.section th { font-weight: 700; }
-.tablewrap { overflow-x: auto; }
+.empty { padding: 30px 24px; max-width: 42em; background: var(--panel); border: 1px dashed var(--line); border-radius: 20px; margin-top: 4px; }
+.empty h3 { font: 700 1.2rem var(--display); margin: 0 0 6px; }
+.empty p { margin: 6px 0 0; color: var(--muted); }
+
+/* Sources */
+.sources { margin-top: 40px; }
+.tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.sources table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+.sources th, .sources td { text-align: left; padding: 9px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+.sources thead th { border-top: 0; font-weight: 700; color: var(--muted); font-size: .85rem; }
+.sources td.n { font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; font-size: .78rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; margin-right: 6px; }
+.badge.fetch { background: var(--fetch-soft); color: var(--fetch); }
+.badge.agent { background: var(--agent-soft); color: var(--agent); }
 .filtered { color: var(--muted); font-size: .9rem; margin: 12px 0 0; }
 .warnings { color: var(--bad); font-size: .9rem; padding-left: 18px; }
+.warnings li { margin-top: 4px; overflow-wrap: anywhere; }
 
-@media (max-width: 640px) {
-  li.job { grid-template-columns: 54px 1fr; }
-  .score { font-size: 1.6rem; }
-  .apply { grid-column: 2; justify-self: start; margin-top: 6px; }
-  .toolbar .count { margin-left: 0; }
+@media (max-width: 760px) {
+  .pipeline { grid-template-columns: 1fr 1fr; row-gap: 18px; }
+  .station:nth-child(2)::after { display: none; }
+  li.job { grid-template-columns: 52px 1fr; padding: 16px; }
+  .apply { grid-column: 2; margin-top: 8px; }
+  .toolbar .count { margin-left: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  li.job.fresh { animation: arrive .5s ease-out both; }
-  @keyframes arrive { from { background: var(--accent-soft); } to { background: transparent; } }
+  li.job.fresh { animation: arrive .7s ease-out both; }
+  @keyframes arrive { from { background: var(--new); } to { background: transparent; } }
 }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand">Job finder</div>
-    <div class="keystate" id="keystate">Checking setup</div>
-  </header>
+<header class="top">
+  <a class="brand" href="/">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="14" cy="16" rx="10" ry="7" fill="var(--search)"/><path d="M23 16l7-6v12z" fill="var(--search)"/><circle cx="9" cy="14" r="1.6" fill="var(--panel)"/></svg>
+    Job finder
+  </a>
+  <span class="keystate" id="keystate"><span class="dot" aria-hidden="true"></span><span id="keytext">Checking setup</span></span>
+</header>
 
-  <form id="form" autocomplete="off" novalidate>
-    <p class="sentence">
-      Find
-      <label class="sr" for="role">Role</label><input id="role" name="role" placeholder="software engineer" required>
-      roles at
-      <label class="sr" for="seniority">Level</label>
-      <select id="seniority" name="seniority">
-        <option value="any">any</option>
-        <option value="intern">intern</option>
-        <option value="entry">new grad</option>
-        <option value="mid">mid</option>
-        <option value="senior">senior</option>
-        <option value="staff">staff+</option>
-        <option value="manager">manager</option>
-      </select>
-      level in
-      <label class="sr" for="locations">Locations, separated by semicolons</label><input id="locations" name="locations" placeholder="New York; Remote">,
-      and I
-      <label class="sr" for="visa">Visa sponsorship</label>
-      <select id="visa" name="visa">
-        <option value="any">don't need</option>
-        <option value="need">need</option>
-      </select>
-      visa sponsorship.
-    </p>
+<main class="wrap">
+  <section class="hero">
+    <form id="form" autocomplete="off" novalidate>
+      <p class="sentence">
+        Find
+        <label class="sr" for="role">Role</label><input id="role" name="role" placeholder="software engineer" required>
+        roles at
+        <label class="sr" for="seniority">Level</label>
+        <select id="seniority" name="seniority">
+          <option value="any">any</option>
+          <option value="intern">intern</option>
+          <option value="entry">new grad</option>
+          <option value="mid">mid</option>
+          <option value="senior">senior</option>
+          <option value="staff">staff+</option>
+          <option value="manager">manager</option>
+        </select>
+        level in
+        <label class="sr" for="locations">Locations, separated by semicolons</label><input id="locations" name="locations" placeholder="London; Remote">,
+        and I
+        <label class="sr" for="visa">Visa sponsorship</label>
+        <select id="visa" name="visa">
+          <option value="any">don't need</option>
+          <option value="need">need</option>
+        </select>
+        visa sponsorship.
+      </p>
 
-    <details class="more" id="more">
-      <summary>More options: companies, keywords, freshness</summary>
-      <div class="grid">
-        <div class="field">
-          <label for="companies">Companies to always check</label>
-          <textarea id="companies" placeholder="Stripe&#10;Figma&#10;https://careers.example.com"></textarea>
-          <div class="hint">One per line. Names or careers page URLs.</div>
-        </div>
-        <div class="field">
-          <label for="keywords">Keywords that should rank higher</label>
-          <input id="keywords" placeholder="python, backend, payments">
-          <div class="field" style="margin-top:12px">
+      <div class="actions">
+        <button class="primary" id="go" type="submit">Find jobs</button>
+        <button class="ghost" id="save" type="button">Save this search</button>
+        <button class="quiet" id="moreBtn" type="button" aria-expanded="false" aria-controls="more">More options</button>
+      </div>
+
+      <div class="drawer" id="more" hidden>
+        <fieldset>
+          <legend>Companies</legend>
+          <div class="field">
+            <label for="companies">Companies to always check</label>
+            <textarea id="companies" placeholder="Stripe&#10;Figma&#10;https://careers.example.com"></textarea>
+            <div class="hint">One per line, as names or careers page links.</div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Ranking</legend>
+          <div class="field">
+            <label for="keywords">Words that rank a job higher</label>
+            <input id="keywords" placeholder="python, payments">
+          </div>
+          <div class="field">
             <label for="exclude">Hide jobs that mention</label>
             <input id="exclude" placeholder="clearance, unpaid">
           </div>
-        </div>
-        <div class="field">
-          <label for="country">Search country</label>
-          <select id="country">
-            <option value="">Automatic (from your locations)</option>
+        </fieldset>
+        <fieldset>
+          <legend>Place and time</legend>
+          <div class="field">
+            <label for="country">Search country</label>
+            <select id="country">
+            <option value="">Automatic</option>
             <option value="AR">Argentina</option>
             <option value="AU">Australia</option>
             <option value="AT">Austria</option>
@@ -250,79 +365,85 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
             <option value="US">United States</option>
             <option value="UY">Uruguay</option>
             <option value="VN">Vietnam</option>
-          </select>
-          <div class="hint">Each city you type is searched in its own country. This is for remote jobs and cities the app does not know.</div>
-          <div class="field" style="margin-top:12px">
+            </select>
+            <div class="hint">Each city you type is searched in its own country. This is for remote jobs and cities the app does not know.</div>
+          </div>
+          <div class="field">
             <label for="days">Posted within</label>
             <select id="days">
               <option value="7">7 days</option><option value="14">14 days</option><option value="30" selected>30 days</option>
               <option value="60">60 days</option><option value="0">any time</option>
             </select>
           </div>
-        </div>
-        <div class="field">
-          <label for="agents">Careers sites to browse with Agent</label>
-          <select id="agents">
-            <option value="0">0 (free: Search and Fetch only)</option><option value="1">1</option>
-            <option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option>
-            <option value="10">10</option><option value="15">15</option><option value="20">20</option>
-          </select>
-          <div class="hint">Agent runs use TinyFish credits. Results are cached for 12 hours.</div>
-          <div style="margin-top:10px" class="check"><input type="checkbox" id="discover" checked><label for="discover">Discover new companies with Search</label></div>
-          <div style="margin-top:6px" class="check"><input type="checkbox" id="hideNo" checked><label for="hideNo">Hide jobs that say no sponsorship</label></div>
-          <div style="margin-top:6px" class="check"><input type="checkbox" id="force"><label for="force">Skip caches and read everything live</label></div>
-        </div>
+        </fieldset>
+        <fieldset>
+          <legend>How it reads</legend>
+          <div class="field">
+            <label for="agents">Careers sites to browse with Agent</label>
+            <select id="agents">
+              <option value="0">0 (free: Search and Fetch only)</option><option value="1">1</option>
+              <option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option>
+              <option value="10">10</option><option value="15">15</option><option value="20">20</option>
+            </select>
+            <div class="hint">Agent runs use TinyFish credits. Results are kept for 12 hours.</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="discover" checked>Find new companies with Search</label>
+          <label class="switch"><input type="checkbox" id="hideNo" checked>Hide jobs that say no sponsorship</label>
+          <label class="switch"><input type="checkbox" id="force">Skip saved results and read everything live</label>
+        </fieldset>
       </div>
-    </details>
-
-    <div class="actions">
-      <button class="primary" id="go" type="submit">Find jobs</button>
-      <button id="save" type="button">Save this search</button>
-    </div>
-    <p class="err" id="formErr" role="alert" hidden></p>
-  </form>
+      <p class="err" id="formErr" role="alert" hidden></p>
+    </form>
+    <p class="powered">Reads company job boards live with TinyFish Search, Fetch and Agent, then ranks every opening for you.</p>
+  </section>
 
   <section class="saved" id="savedBox" hidden>
-    <h2>Saved searches</h2>
+    <h2 class="section">Saved searches</h2>
     <ul id="savedList"></ul>
   </section>
 
-  <section class="progress" id="progress" hidden aria-live="polite">
-    <h2 id="progressTitle">Searching</h2>
-    <ol id="log"></ol>
+  <section class="run" id="progress" hidden aria-live="polite">
+    <div class="run-head"><h2 id="progressTitle">Searching</h2><span class="sub" id="runTime"></span></div>
+    <ol class="pipeline">
+      <li class="station" data-stage="search"><span class="num">1</span><h3>Search</h3><p class="stat">Waiting</p><p class="sub">Finds company job boards</p><p class="live"></p></li>
+      <li class="station" data-stage="fetch"><span class="num">2</span><h3>Fetch</h3><p class="stat">Waiting</p><p class="sub">Reads boards and postings</p><p class="live"></p></li>
+      <li class="station" data-stage="agent"><span class="num">3</span><h3>Agent</h3><p class="stat">Waiting</p><p class="sub">Browses sites Fetch can't read</p><p class="live"></p></li>
+      <li class="station" data-stage="match"><span class="num">4</span><h3>Match</h3><p class="stat">Waiting</p><p class="sub">Filters and ranks for you</p><p class="live"></p></li>
+    </ol>
+    <details class="log"><summary>Full log</summary><ol id="log"></ol></details>
   </section>
 
   <section id="results" hidden>
-    <p class="usage" id="roleNote" hidden></p>
-    <p class="summary" id="summary"></p>
-    <p class="usage" id="usage"></p>
+    <p class="note" id="roleNote" hidden></p>
+    <div class="results-head"><h2 id="summary"></h2><p id="summarySub"></p></div>
     <div class="toolbar" role="group" aria-label="Filter results">
       <label class="sr" for="q">Filter by text</label>
       <input type="search" id="q" placeholder="Filter by title, company or city">
       <label class="sr" for="sort">Sort</label>
       <select id="sort"><option value="score">Best match</option><option value="date">Newest</option></select>
-      <span class="check"><input type="checkbox" id="fNew"><label for="fNew">New only</label></span>
-      <span class="check"><input type="checkbox" id="fRemote"><label for="fRemote">Remote only</label></span>
-      <span class="check"><input type="checkbox" id="fVisa"><label for="fVisa">Mentions sponsorship</label></span>
-      <button class="link" id="csv" type="button">Export CSV</button>
+      <label class="pill"><input type="checkbox" id="fNew">New only</label>
+      <label class="pill"><input type="checkbox" id="fRemote">Remote only</label>
+      <label class="pill"><input type="checkbox" id="fVisa">Mentions sponsorship</label>
+      <button class="quiet" id="csv" type="button">Export CSV</button>
       <span class="count" id="count"></span>
     </div>
     <ol class="jobs" id="jobs"></ol>
     <div class="empty" id="empty" hidden></div>
 
-    <div class="section">
-      <h2>Where these came from</h2>
+    <section class="sources">
+      <h2 class="section">Where these came from</h2>
       <div class="tablewrap"><table id="sources"></table></div>
       <p class="filtered" id="filteredNote" hidden></p>
       <ul class="warnings" id="warnings"></ul>
-    </div>
+    </section>
   </section>
-</div>
+</main>
 
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { taskId: null, result: null, logSeen: 0, timer: null };
+  const state = { taskId: null, result: null, logSeen: 0, timer: null, startedAt: 0, stage: null, counts: {} };
+  const STAGES = ['search', 'fetch', 'agent', 'match'];
 
   function el(tag, attrs = {}, ...kids) {
     const n = document.createElement(tag);
@@ -333,29 +454,26 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     for (const k of kids) if (k !== null && k !== undefined) n.append(k.nodeType ? k : document.createTextNode(String(k)));
     return n;
   }
+  function svg(markup) {
+    const t = document.createElement('template');
+    t.innerHTML = markup.trim();
+    return t.content.firstChild;
+  }
   const safeHref = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
   const IRREGULAR = { match: 'matches', company: 'companies', query: 'queries' };
-  const plural = (n, w) => `${n.toLocaleString()} ${n === 1 ? w : (IRREGULAR[w] || `${w}s`)}`;
+  const plural = (n, w) => `${Number(n).toLocaleString()} ${n === 1 ? w : (IRREGULAR[w] || `${w}s`)}`;
   function ago(iso) {
     if (!iso) return null;
     const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
     return d <= 0 ? 'posted today' : d === 1 ? 'posted yesterday' : `posted ${d} days ago`;
   }
 
+  // ===== Form =====
   function readPrefs() {
     return {
-      role: $('role').value.trim(),
-      seniority: $('seniority').value,
-      locations: $('locations').value,
-      visa: $('visa').value,
-      hideNoSponsor: $('hideNo').checked,
-      companies: $('companies').value,
-      keywords: $('keywords').value,
-      exclude: $('exclude').value,
-      country: $('country').value,
-      postedWithinDays: Number($('days').value),
-      maxAgentRuns: Number($('agents').value),
-      discover: $('discover').checked,
+      role: $('role').value.trim(), seniority: $('seniority').value, locations: $('locations').value, visa: $('visa').value,
+      hideNoSponsor: $('hideNo').checked, companies: $('companies').value, keywords: $('keywords').value, exclude: $('exclude').value,
+      country: $('country').value, postedWithinDays: Number($('days').value), maxAgentRuns: Number($('agents').value), discover: $('discover').checked,
     };
   }
   function writePrefs(p) {
@@ -372,26 +490,30 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     $('days').value = String(p.postedWithinDays ?? 30);
     $('agents').value = String(p.maxAgentRuns ?? 2);
     $('discover').checked = p.discover !== false;
-    sizeInputs();
-    sizeSelects();
+    sizeFields();
   }
-  function sizeInputs() {
-    for (const id of ['role', 'locations']) {
-      const i = $(id);
-      const len = i.value.length || i.placeholder.length;
-      i.style.width = `${Math.max(len, 5) * 0.95 + 1}ch`;
-    }
+  // Size each slot in the sentence to its text, measured in its real font.
+  const measurer = document.createElement('canvas').getContext('2d');
+  function fitWidth(node, text, extra = 0) {
+    const cs = getComputedStyle(node);
+    measurer.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const box = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((s, k) => s + parseFloat(cs[k] || 0), 0);
+    const ls = (parseFloat(cs.letterSpacing) || 0) * text.length; // canvas ignores letter spacing
+    node.style.width = `${Math.ceil(measurer.measureText(text).width + ls + box + extra + 2)}px`;
   }
-  function sizeSelects() {
-    for (const id of ['seniority', 'visa']) {
-      const sel = $(id);
-      const text = sel.options[sel.selectedIndex].text;
-      sel.style.width = `${Math.max(text.length, 3) * 0.86 + 1.2}ch`;
-    }
+  function sizeFields() {
+    for (const id of ['role', 'locations']) { const i = $(id); fitWidth(i, i.value || i.placeholder); }
+    for (const id of ['seniority', 'visa']) { const s = $(id); fitWidth(s, s.options[s.selectedIndex].text); }
   }
-  ['role', 'locations'].forEach((id) => $(id).addEventListener('input', sizeInputs));
-  ['seniority', 'visa'].forEach((id) => $(id).addEventListener('change', sizeSelects));
-
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(sizeFields);
+  ['role', 'locations'].forEach((id) => $(id).addEventListener('input', sizeFields));
+  ['seniority', 'visa'].forEach((id) => $(id).addEventListener('change', sizeFields));
+  $('moreBtn').addEventListener('click', () => {
+    const open = $('more').hidden;
+    $('more').hidden = !open;
+    $('moreBtn').setAttribute('aria-expanded', String(open));
+    $('moreBtn').textContent = open ? 'Fewer options' : 'More options';
+  });
   function showError(msg) { const e = $('formErr'); e.textContent = msg; e.hidden = !msg; }
 
   async function api(path, opts = {}) {
@@ -401,14 +523,90 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     return body;
   }
 
+  // ===== Pipeline =====
+  function station(stage) { return document.querySelector(`.station[data-stage="${stage}"]`); }
+  // status: a class to set, null to clear, or undefined to leave the state as it is.
+  function setStation(stage, status, stat, live) {
+    const s = station(stage);
+    if (status !== undefined) {
+      s.classList.remove('active', 'done', 'skipped');
+      if (status) s.classList.add(status);
+    }
+    if (stat !== undefined) s.querySelector('.stat').textContent = stat;
+    if (live !== undefined) {
+      const box = s.querySelector('.live');
+      box.replaceChildren(...(Array.isArray(live) ? live : [live]).filter((x) => x !== null && x !== undefined));
+    }
+  }
+  function resetPipeline() {
+    state.stage = null;
+    state.counts = { search: 0, agentSites: 0 };
+    state.liveRuns = new Map(); // company -> live browser link, while that run is going
+    for (const st of STAGES) setStation(st, null, 'Waiting', '');
+  }
+  function enterStage(stage) {
+    const idx = STAGES.indexOf(stage);
+    const cur = STAGES.indexOf(state.stage);
+    if (idx <= cur) return;
+    for (let i = Math.max(cur, 0); i < idx; i++) {
+      const s = station(STAGES[i]);
+      if (s.classList.contains('active')) setStation(STAGES[i], 'done', s.querySelector('.stat').textContent === 'Working' ? 'Done' : undefined);
+      else if (!s.classList.contains('done')) setStation(STAGES[i], 'skipped', 'Not needed');
+    }
+    state.stage = stage;
+    setStation(stage, 'active', 'Working');
+  }
+  function onLogLine(line) {
+    const m = line.msg;
+    // Only the main step messages move the pipeline forward; other lines update text.
+    if (line.kind === 'step') {
+      if (/TinyFish Search|watchlist/.test(m)) enterStage('search');
+      else if (/job boards with TinyFish Fetch|Workday sites? with TinyFish Fetch/.test(m)) enterStage('fetch');
+      else if (/TinyFish Agent/.test(m)) enterStage('agent');
+      else if (/^Matching/.test(m)) enterStage('match');
+      if (state.stage) setStation(state.stage, undefined, undefined, m);
+    } else if (line.kind === 'search') {
+      state.counts.search++;
+      setStation('search', undefined, plural(state.counts.search, 'query'), m);
+    } else if (line.kind === 'fetch') {
+      if (state.stage === 'fetch') setStation('fetch', undefined, undefined, m);
+    } else if (line.kind === 'agent') {
+      enterStage('agent');
+      const company = m.split(':')[0];
+      const live = line.link && safeHref(line.link);
+      if (live) state.liveRuns.set(company, live);
+      if (/Agent is browsing/.test(m)) state.counts.agentSites++;
+      if (/run completed|run failed|run cancelled|Agent returned|could not read|from the last/.test(m)) state.liveRuns.delete(company);
+      // Keep a link for every run still going, so a later log line never hides it.
+      const links = [...state.liveRuns].map(([co, href]) => el('a', { href, target: '_blank', rel: 'noopener', text: `Watch ${co} live` }));
+      const watch = links.length ? el('span', { class: 'watch' }, ...links.flatMap((a, i) => (i ? [' ', a] : [a]))) : null;
+      setStation('agent', undefined, state.counts.agentSites ? `Browsing ${plural(state.counts.agentSites, 'site')}` : undefined, [el('span', { text: m }), watch]);
+    }
+  }
+  function finishPipeline(r) {
+    const u = r.usage;
+    const c = r.counts;
+    setStation('search', 'done', plural(u.search.calls, 'query'), `${plural(r.boards.length + r.agentSites.length, 'careers page')} found`);
+    setStation('fetch', 'done', `${plural(u.fetch.urls, 'page')} read`, `${plural(c.collected, 'job')} collected${u.fetch.failed ? `, ${u.fetch.failed} pages could not be read` : ''}`);
+    const ran = u.agent.runs + u.agent.cached;
+    if (ran) setStation('agent', 'done', `${plural(ran, 'site')} browsed`, u.agent.cached ? `${u.agent.cached} reused from earlier, no credits` : `${u.agent.steps || 0} steps in total`);
+    else setStation('agent', 'skipped', 'Not needed', 'Fetch read every site');
+    setStation('match', 'done', plural(c.matched, 'match'), `from ${plural(c.unique, 'unique job')}`);
+  }
+
+  // ===== Running a search =====
   async function start(path, body) {
     showError('');
     $('go').disabled = true;
     $('go').textContent = 'Searching';
     $('progress').hidden = false;
     $('progressTitle').textContent = 'Searching';
+    $('runTime').textContent = '';
     $('log').replaceChildren();
+    resetPipeline();
     state.logSeen = 0;
+    state.startedAt = Date.now();
+    $('progress').scrollIntoView({ behavior: 'smooth', block: 'start' });
     try {
       const { taskId } = await api(path, { method: 'POST', body: JSON.stringify(body) });
       state.taskId = taskId;
@@ -427,17 +625,20 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     try {
       const t = await api(`/api/task/${state.taskId}?since=${state.logSeen}`);
       for (const line of t.log) {
-        const li = el('li', { class: line.kind }, el('span', { class: 'kind', text: line.kind === 'step' ? '' : line.kind }), line.msg);
+        const li = el('li', { class: line.kind }, el('span', { class: 'kind', text: line.kind }), line.msg);
         const live = line.link && safeHref(line.link);
         if (live) li.append(' ', el('a', { href: live, target: '_blank', rel: 'noopener', text: 'Watch live' }));
         $('log').append(li);
+        onLogLine(line);
       }
       state.logSeen += t.log.length;
-      $('log').scrollTop = $('log').scrollHeight;
+      $('runTime').textContent = `${Math.round((Date.now() - state.startedAt) / 1000)}s`;
       if (t.status === 'running') { state.timer = setTimeout(poll, 1200); return; }
       done();
       if (t.status === 'error') { $('progressTitle').textContent = 'Search stopped'; showError(t.error); return; }
-      $('progressTitle').textContent = `Finished in ${Math.round(t.result.durationMs / 1000)}s`;
+      $('progressTitle').textContent = 'Search finished';
+      $('runTime').textContent = `${Math.round(t.result.durationMs / 1000)}s`;
+      finishPipeline(t.result);
       render(t.result, true);
       loadSaved();
     } catch (err) {
@@ -446,36 +647,24 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     }
   }
 
-  function summaryText(r) {
-    const c = r.counts;
-    const companies = new Set(r.listings.map((l) => l.company)).size;
-    let s = `${plural(c.matched, 'match')} from ${plural(c.unique, 'open job')} across ${plural(r.boards.length + r.agentSites.length, 'careers page')}`;
-    if (c.matched) s += `, at ${plural(companies, 'company')}`;
-    s += '.';
-    if (!r.firstRun) s += ` ${c.newSinceLastRun} new since your last run.`;
-    else s += ' First run of this search, so next time new jobs will be marked.';
-    return s;
-  }
-  function usageText(u) {
-    const parts = [
-      `Search: ${plural(u.search.calls, 'query')}`,
-      `Fetch: ${plural(u.fetch.calls, 'call')} reading ${plural(u.fetch.urls, 'URL')}${u.fetch.failed ? `, ${u.fetch.failed} failed` : ''}`,
-      `Agent: ${plural(u.agent.runs, 'run')}${u.agent.cached ? `, ${u.agent.cached} from cache` : ''}`,
-    ];
-    return `TinyFish usage. ${parts.join('. ')}.`;
-  }
-
+  // ===== Results =====
   function render(r, fresh) {
     state.result = r;
     $('results').hidden = false;
     $('roleNote').hidden = !r.roleNote;
     $('roleNote').textContent = r.roleNote || '';
-    $('summary').textContent = summaryText(r);
-    $('usage').textContent = usageText(r.usage);
+    const c = r.counts;
+    const companies = new Set(r.listings.map((l) => l.company)).size;
+    $('summary').textContent = c.matched
+      ? `${plural(c.matched, 'match')} at ${plural(companies, 'company')}, from ${plural(c.unique, 'open job')}`
+      : `No matches in ${plural(c.unique, 'open job')}`;
+    $('summarySub').textContent = r.firstRun
+      ? 'First run of this search. Next time, new jobs get a New label.'
+      : `${plural(c.newSinceLastRun, 'new job')} since your last run.`;
+    if (!fresh) finishPipeline(r);
     renderJobs(fresh);
     renderSources(r);
   }
-
   function filtered() {
     const r = state.result;
     const q = $('q').value.trim().toLowerCase();
@@ -487,17 +676,38 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     if ($('sort').value === 'date') list = [...list].sort((a, b) => String(b.postedAt || '').localeCompare(String(a.postedAt || '')));
     return list;
   }
+  function hue(s) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; }
+  function initials(name) {
+    const w = String(name || '?').replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+    return ((w[0] || '?')[0] + (w[1] ? w[1][0] : (w[0] || '')[1] || '')).toUpperCase();
+  }
+  function sourceOf(l) {
+    const s = l.sources || [];
+    if (s.some((x) => x.startsWith('agent:'))) return ['agent', 'Found by Agent'];
+    if (s.some((x) => x.startsWith('fetch:') && x !== 'fetch:page')) return ['fetch', 'Read by Fetch'];
+    return ['search', 'Found by Search'];
+  }
+  function scoreRing(score) {
+    const band = score >= 75 ? 'hi' : score >= 50 ? 'mid' : 'lo';
+    const C = 2 * Math.PI * 21;
+    const ring = el('div', { class: `ring ${band}`, title: 'Match score out of 100' });
+    ring.append(svg(`<svg viewBox="0 0 52 52" aria-hidden="true"><circle class="track" cx="26" cy="26" r="21"/><circle class="val" cx="26" cy="26" r="21" stroke-dasharray="${(C * score / 100).toFixed(1)} ${C.toFixed(1)}"/></svg>`));
+    ring.append(el('span', { text: score }), el('span', { class: 'sr', text: ' out of 100' }));
+    return ring;
+  }
+  const PIN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.4 4.5 8.5 4.5 8.5s4.5-5.1 4.5-8.5A4.5 4.5 0 0 0 8 1.5zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" fill="currentColor"/></svg>';
 
   function jobRow(l, fresh) {
     const href = safeHref(l.applyUrl) || safeHref(l.url);
-    const band = l.score >= 75 ? 'hi' : l.score >= 50 ? 'mid' : 'lo';
-    const meter = el('span', { class: 'meter', 'aria-hidden': 'true' }, el('span', { style: `height:${l.score}%` }));
-    const score = el('div', { class: `score ${band}`, title: 'Match score out of 100' }, meter, el('span', { text: l.score }), el('span', { class: 'sr', text: ' out of 100' }));
-
     const title = el('h3', { class: 'jt' }, href ? el('a', { href, target: '_blank', rel: 'noopener', text: l.title }) : l.title);
-    const meta = el('div', { class: 'jm' }, el('strong', { text: l.company }), `, ${l.location || 'location not listed'}`);
+    const mono = el('span', { class: 'mono', style: `--h:${hue(l.company)}`, 'aria-hidden': 'true', text: initials(l.company) });
+    const meta = el('div', { class: 'jm' },
+      el('span', { class: 'co' }, mono, l.company),
+      el('span', { class: 'loc' }, svg(PIN), l.location || 'Location not listed'));
     const chips = el('div', { class: 'chips' });
     if (l.isNew) chips.append(el('span', { class: 'chip new', text: 'New' }));
+    const [src, srcText] = sourceOf(l);
+    chips.append(el('span', { class: `chip src-${src}`, text: srcText }));
     if (l.level && l.level !== 'unspecified') chips.append(el('span', { class: 'chip', text: l.levelLabel }));
     if (l.remote) chips.append(el('span', { class: 'chip', text: 'Remote' }));
     const visaText = { yes: 'Sponsorship mentioned', opt: 'Mentions OPT/CPT', no: 'No sponsorship' }[l.visa.status];
@@ -505,17 +715,16 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     const posted = ago(l.postedAt);
     if (posted) chips.append(el('span', { class: 'chip', text: posted }));
     if (l.salary) chips.append(el('span', { class: 'chip', text: l.salary }));
-
-    const why = l.reasons.length ? el('div', { class: 'why', text: `Why: ${l.reasons.join('; ')}.` }) : null;
+    const why = l.reasons.length ? el('div', { class: 'why', text: `Why it matches: ${l.reasons.join('; ')}.` }) : null;
     let ev = null;
     if (l.visa.evidence || l.otherLocations.length || l.sources.length) {
       ev = el('details', {}, el('summary', { text: 'Details' }));
       if (l.visa.evidence) ev.append(el('p', { text: `Visa text from the posting: "${l.visa.evidence}"` }));
       if (l.otherLocations.length) ev.append(el('p', { text: `Also listed in: ${l.otherLocations.join('; ')}` }));
-      ev.append(el('p', { text: `Found via ${l.sources.join(', ')}${l.ats ? ` on ${l.ats}` : ''}.` }));
+      ev.append(el('p', { text: `Sources: ${l.sources.join(', ')}${l.ats ? `, on ${l.ats}` : ''}.` }));
     }
     const apply = el('div', { class: 'apply' }, href ? el('a', { href, target: '_blank', rel: 'noopener', text: 'Apply' }) : null);
-    return el('li', { class: `job${fresh && l.isNew ? ' fresh' : ''}` }, score, el('div', {}, title, meta, chips, why, ev), apply);
+    return el('li', { class: `job${fresh && l.isNew ? ' fresh' : ''}` }, scoreRing(l.score), el('div', {}, title, meta, chips, why, ev), apply);
   }
 
   function renderJobs(fresh) {
@@ -523,21 +732,23 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     const r = state.result;
     $('count').textContent = `Showing ${list.length} of ${r.listings.length}`;
     $('jobs').replaceChildren(...list.map((l) => jobRow(l, fresh)));
+    $('jobs').hidden = !list.length;
     const empty = $('empty');
     if (list.length) { empty.hidden = true; return; }
     empty.hidden = false;
     empty.replaceChildren();
     if (r.listings.length) {
-      empty.append(el('p', { text: 'No jobs match these filters. Clear the filters above to see all matches.' }));
+      empty.append(el('h3', { text: 'No jobs match these filters' }), el('p', { text: 'Clear the filters above to see all matches.' }));
       return;
     }
     const top = Object.entries(r.filteredOut).sort((a, b) => b[1] - a[1]);
+    empty.append(el('h3', { text: r.counts.unique ? 'No matches this time' : 'No jobs were read' }));
     empty.append(el('p', { text: r.counts.unique
-      ? `No matches yet. ${plural(r.counts.unique, 'job')} were read and filtered out.`
-      : 'No jobs were read. Check the notes below, add companies to always check, or try a broader role.' }));
+      ? `${plural(r.counts.unique, 'job')} were read and none fit your search.`
+      : 'Check the notes below, add companies to always check, or try a broader role.' }));
     if (top.length) {
-      const hints = { role: 'check the spelling or try a broader role name', level: 'set the level to any', location: 'add Remote or another city', visa: 'untick "Hide jobs that say no sponsorship" to see them', fresh: 'allow older postings', keywords: 'remove a hidden word' };
-      empty.append(el('p', { text: `Filtered out by: ${top.map(([k, v]) => `${k} (${v})`).join(', ')}. To widen the search, ${hints[top[0][0]] || 'loosen your filters'}.` }));
+      const hints = { role: 'check the spelling or try a broader role name', level: 'set the level to any', location: 'add Remote or another city', visa: 'turn off "Hide jobs that say no sponsorship"', fresh: 'allow older postings', keywords: 'remove a hidden word' };
+      empty.append(el('p', { text: `Most were removed by ${top[0][0]} (${top[0][1]}). To widen the search, ${hints[top[0][0]] || 'loosen your filters'}.` }));
     }
   }
 
@@ -545,14 +756,16 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     const t = $('sources');
     t.replaceChildren(el('thead', {}, el('tr', {}, el('th', { text: 'Company' }), el('th', { text: 'How it was read' }), el('th', { text: 'Open jobs read' }), el('th', { text: 'Page' }))));
     const body = el('tbody');
-    for (const b of r.boards) {
-      const href = safeHref(b.url);
-      body.append(el('tr', {}, el('td', { text: b.company }), el('td', { text: `Fetch, ${b.ats} ${b.via}${b.note ? ` (${b.note})` : ''}` }), el('td', { text: b.jobs }), el('td', {}, href ? el('a', { href, target: '_blank', rel: 'noopener', text: new URL(href).hostname }) : '')));
-    }
-    for (const a of r.agentSites) {
-      const href = safeHref(a.url);
-      body.append(el('tr', {}, el('td', { text: a.company }), el('td', { text: `Agent, ${a.ats} (${a.status}${a.steps ? `, ${a.steps} steps` : ''})` }), el('td', { text: a.jobs }), el('td', {}, href ? el('a', { href, target: '_blank', rel: 'noopener', text: new URL(href).hostname }) : '')));
-    }
+    const row = (company, kind, how, jobs, url) => {
+      const href = safeHref(url);
+      body.append(el('tr', {},
+        el('td', { text: company }),
+        el('td', {}, el('span', { class: `badge ${kind}`, text: kind === 'agent' ? 'Agent' : 'Fetch' }), how),
+        el('td', { class: 'n', text: jobs }),
+        el('td', {}, href ? el('a', { href, target: '_blank', rel: 'noopener', text: new URL(href).hostname }) : '')));
+    };
+    for (const b of r.boards) row(b.company, 'fetch', `${b.ats} ${b.via}${b.note ? ` (${b.note})` : ''}`, b.jobs, b.url);
+    for (const a of r.agentSites) row(a.company, 'agent', `${a.ats}, ${a.status}${a.steps ? `, ${a.steps} steps` : ''}`, a.jobs, a.url);
     if (!r.boards.length && !r.agentSites.length) body.append(el('tr', {}, el('td', { colspan: '4', text: 'No careers pages were read.' })));
     t.append(body);
     const drops = Object.entries(r.filteredOut).sort((a, b) => b[1] - a[1]);
@@ -602,16 +815,16 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     $('savedBox').hidden = !list.length;
     $('savedList').replaceChildren(...list.map((s) => {
       const meta = s.lastRunAt
-        ? `Last run ${new Date(s.lastRunAt).toLocaleString()}${s.lastSummary ? `, ${s.lastSummary.matched} matches, ${s.lastSummary.fresh} new` : ''}`
+        ? `Last run ${new Date(s.lastRunAt).toLocaleString()}${s.lastSummary ? `, ${plural(s.lastSummary.matched, 'match')}, ${s.lastSummary.fresh} new` : ''}`
         : 'Not run yet';
-      const run = el('button', { class: 'link', type: 'button', text: 'Run now' });
+      const run = el('button', { class: 'quiet', type: 'button', text: 'Run now' });
       run.onclick = () => { writePrefs(s.prefs); state.taskId = null; start(`/api/searches/${s.id}/run`, { force: $('force').checked }); };
-      const show = el('button', { class: 'link', type: 'button', text: 'Show last results' });
+      const show = el('button', { class: 'quiet', type: 'button', text: 'Show last results' });
       show.onclick = async () => {
-        try { const r = await api(`/api/searches/${s.id}/latest`); writePrefs(s.prefs); state.taskId = null; render(r, false); }
+        try { const r = await api(`/api/searches/${s.id}/latest`); writePrefs(s.prefs); state.taskId = null; $('progress').hidden = false; $('progressTitle').textContent = 'Last run'; render(r, false); }
         catch (err) { showError(err.message); }
       };
-      const del = el('button', { class: 'link', type: 'button', text: 'Delete' });
+      const del = el('button', { class: 'quiet', type: 'button', text: 'Delete' });
       del.onclick = async () => { await api(`/api/searches/${s.id}`, { method: 'DELETE' }); loadSaved(); };
       return el('li', {}, el('div', { class: 'name', text: s.name }), el('div', { class: 'meta', text: meta }), el('div', {}, run, s.lastRunAt ? show : null, del));
     }));
@@ -621,12 +834,12 @@ li.job { display: grid; grid-template-columns: 74px 1fr auto; gap: 4px 18px; pad
     try {
       const s = await api('/api/status');
       const k = $('keystate');
-      k.textContent = s.hasKey ? `Connected to TinyFish${s.refreshHours ? `, saved searches refresh every ${s.refreshHours}h` : ''}` : 'TINYFISH_API_KEY is not set on the server';
+      $('keytext').textContent = s.hasKey ? `Connected to TinyFish${s.refreshHours ? `, saved searches refresh every ${s.refreshHours}h` : ''}` : 'TINYFISH_API_KEY is not set on the server';
+      k.classList.toggle('ok', s.hasKey);
       k.classList.toggle('bad', !s.hasKey);
-    } catch { $('keystate').textContent = 'Server not reachable'; }
+    } catch { $('keytext').textContent = 'Server not reachable'; $('keystate').classList.add('bad'); }
     try { const last = JSON.parse(localStorage.getItem('jf-last') || 'null'); if (last) writePrefs(last); } catch {}
-    sizeInputs();
-    sizeSelects();
+    sizeFields();
     loadSaved();
   })();
 })();

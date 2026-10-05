@@ -9,7 +9,7 @@ A job and internship finder for students. **TinyFish Search** finds which compan
 _Add a 60 to 90 second GIF or MP4 after a live run._ Suggested shots:
 
 1. Type a real search ("software engineer, intern, New York; Remote, need sponsorship"), add two companies you follow, press **Find jobs**.
-2. The progress log: Search finding boards, Fetch reading them, the Agent browsing a custom careers site, with its **Watch live** link open in a second tab.
+2. The pipeline at the top of the results: Search, Fetch and Agent fill in one after another, and each running Agent site shows a **Watch live** link; open one in a second tab.
 3. Results: match score, reasons, a visa chip with the quoted sentence, **Apply** opening the real posting.
 4. "Where these came from": which API read each company, and how many jobs each filter removed.
 5. Run it again: the Agent result comes from cache (0 credits) and **New only** shows only fresh postings.
@@ -186,7 +186,7 @@ The end-to-end test checks that a full run uses all three APIs, returns exactly 
 * `server.js`: web server, background search tasks, saved searches, scheduled refresh
 * `cli.js`: command line version
 * `debug-fetch.js`: shows what Fetch returns for one URL
-* `public/index.html`: the whole UI, plain HTML, CSS and JavaScript
+* `public/index.html`: the whole UI, plain HTML, CSS and JavaScript (search sentence, live four-step pipeline, ranked results with the API that found each job)
 * `src/tinyfish.js`: Search, Fetch and Agent client with retries, timeouts and usage counts
 * `src/discover.js`: step 1, Search queries and watchlist lookup
 * `src/read.js`: steps 2 and 5, Fetch for feeds and posting pages
