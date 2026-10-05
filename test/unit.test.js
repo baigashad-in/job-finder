@@ -306,7 +306,7 @@ test('corrects typos in the role only against real title words', () => {
 test('prefs are validated and capped', () => {
   assert.throws(() => normalizePrefs({ role: '' }), /Add a role/);
   const p = normalizePrefs({ role: 'x', maxAgentRuns: 99, postedWithinDays: -5, seniority: 'wizard', locations: 'Remote' });
-  assert.equal(p.maxAgentRuns, 6);
+  assert.equal(p.maxAgentRuns, 20);
   assert.equal(p.postedWithinDays, 0);
   assert.equal(p.seniority, 'any');
   assert.equal(p.remoteOk, true);

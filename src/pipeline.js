@@ -76,7 +76,7 @@ async function runPipeline(rawPrefs, { tf, store, log = () => {}, force = false 
   const agentQueue = [...feedBoards, ...targets.filter((t) => t.ats !== 'workday' || wd.needAgent.includes(t))].sort(byPriority);
   const useTargets = agentQueue.slice(0, p.maxAgentRuns);
   if (agentQueue.length > useTargets.length) {
-    warnings.push(`Skipped ${plural(agentQueue.length - useTargets.length, 'careers site')} because Agent runs are capped at ${p.maxAgentRuns}. Raise the cap to include them.`);
+    warnings.push(`Skipped ${plural(agentQueue.length - useTargets.length, 'careers site')} because Agent runs are capped at ${p.maxAgentRuns}. Raise "Careers sites to browse with Agent" under More options to include them.`);
   }
   let agent = { listings: [], agentReport: [] };
   if (useTargets.length) {

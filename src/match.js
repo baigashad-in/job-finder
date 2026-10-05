@@ -471,7 +471,7 @@ function normalizePrefs(raw = {}) {
     exclude: list(raw.exclude, /[,;\n]/, 10, 40),
     companies: list(raw.companies, /[\n;,]/, 15, 300),
     postedWithinDays: Number.isFinite(days) ? Math.min(Math.max(days, 0), 180) : 30,
-    maxAgentRuns: Number.isFinite(agents) ? Math.min(Math.max(agents, 0), 6) : 2,
+    maxAgentRuns: Number.isFinite(agents) ? Math.min(Math.max(agents, 0), 20) : 2,
     discover: raw.discover !== false,
   };
 }
