@@ -1,18 +1,10 @@
 # Job Finder
 
-**Live link:** _add URL after deploy (see "Deploying a live demo" below)_
-
 A job and internship finder for students. **TinyFish Search** finds which companies are hiring for your role, **TinyFish Fetch** reads each company's full job board and the posting pages behind the best matches, Fetch also reads Workday search results pages, and **TinyFish Agent** browses the careers sites Fetch cannot read (custom pages, Workable, Ashby job boards, and Workday sites where Fetch fails). The app then matches every opening to your role, level, location and visa needs, removes duplicates, ranks the rest with reasons, and marks what is new since your last check.
 
 ## Demo video
 
-_Add a 60 to 90 second GIF or MP4 after a live run._ Suggested shots:
-
-1. Type a real search ("software engineer, intern, New York, need sponsorship"), switch on **Remote jobs** open to a country, add two companies you follow, press **Find jobs**.
-2. The pipeline at the top of the results: Search, Fetch and Agent fill in one after another, and each running Agent site shows a **Watch live** link; open one in a second tab.
-3. Results: match score, reasons, a visa chip with the quoted sentence, **Apply** opening the real posting.
-4. "Where these came from": which API read each company, and how many jobs each filter removed.
-5. Run it again: the Agent result comes from cache (0 credits) and **New only** shows only fresh postings.
+https://youtu.be/cBIx0cOvfF8
 
 ## How TinyFish is called
 
