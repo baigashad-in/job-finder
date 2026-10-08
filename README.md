@@ -111,16 +111,6 @@ src/pipeline.js
 data/  saved searches, seen jobs, Agent cache (JSON files)
 ```
 
-## Deploying a live demo
-
-The server needs a host that keeps a Node process running, such as Render, Railway or Fly.io. Searches run as background tasks in memory, so serverless platforms (like Vercel functions) will not work without changes.
-
-Before you make it public:
-
-* Set `HOST=0.0.0.0` so the host can reach it.
-* Set `AGENT_RUNS_LIMIT=1` or `0`. Every visitor's search spends your Agent credits; Search and Fetch stay free.
-* Saved searches and "new since last run" are shared by everyone using the server. There are no user accounts.
-
 ## What each TinyFish API does here
 
 **Search (free)** asks each job system separately (Greenhouse, Lever, Ashby, Workday, then SmartRecruiters and Workable), using `include_domains`, because one combined query returns only 10 results and one system can crowd out the rest. Each city you type is searched in its own country ("New York; London" searches the US and the UK; 58 countries and their main tech cities are known, accents included). Remote jobs have their own switch under the search sentence, with the country they must be open to: your city's country (the default), anywhere, or one of the 58 countries. The remote searches run in that country, and remote jobs limited to a different country rank lower with a note; "anywhere" turns that off. A city the app does not recognize uses that country too, or you can add the country to the city ("Kochi, India"). Older searches with "Remote" typed in the locations still work. An extra query across all systems uses `recency_minutes` so recent postings surface first. A single hit like `job-boards.greenhouse.io/acme/jobs/123` tells the app Acme has a Greenhouse board, so it reads the whole board, not just that posting. Search also turns company names in your watchlist into their real job boards, and finds a company's own careers page when it has no job-system board (LinkedIn, Indeed and other aggregators excluded).
